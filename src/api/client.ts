@@ -1,5 +1,3 @@
-import { env } from '../config/env'
-
 export interface ApiResponse<T> {
   data: T
   status: number
@@ -19,13 +17,13 @@ export class ApiError extends Error {
 }
 
 /**
- * Base fetch client configured with base URL, timeout, and typed error handling
+ * Base fetch client configured with timeout and typed error handling
  */
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${env.apiBaseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
+  const url = endpoint.startsWith('http') ? endpoint : `/api${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -57,7 +55,7 @@ export async function apiClient<T>(
     }
     // Return friendly error rather than raw stack trace
     throw new ApiError(
-      'Security intelligence service is temporarily unavailable. Utilizing local SOC cache.',
+      'Security intelligence service is temporarily unavailable.',
       503,
       'SERVICE_UNAVAILABLE'
     )

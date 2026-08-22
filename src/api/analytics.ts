@@ -1,5 +1,3 @@
-import { env } from '../config/env'
-
 export type AnalyticsEventType =
   | 'dashboard_view'
   | 'threat_opened'
@@ -20,8 +18,6 @@ export interface AnalyticsPayload {
 }
 
 export function trackEvent(eventType: AnalyticsEventType, properties?: AnalyticsPayload): void {
-  if (!env.analyticsId) return
-
   // Privacy-safety check: strictly omit sensitive fields
   const sanitizedProps = { ...(properties || {}) }
   delete (sanitizedProps as Record<string, unknown>)['password']
