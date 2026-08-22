@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit": "node scripts/audit_codebase.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

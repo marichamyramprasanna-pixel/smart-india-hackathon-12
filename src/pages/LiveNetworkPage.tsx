@@ -5,7 +5,7 @@ import { Badge } from '../components/common/Badge'
 import { Button } from '../components/common/Button'
 import { LiveEventFeed } from '../components/dashboard/LiveEventFeed'
 import { ActiveConnectionsTable } from '../components/device/ActiveConnectionsTable'
-import { mockDeviceConnections } from '../api/devices'
+import { demoDeviceConnections } from '../data/demo/devices'
 import { useDemoScenario } from '../../src/context/DemoScenarioContext'
 
 export const LiveNetworkPage: React.FC = () => {
@@ -13,7 +13,7 @@ export const LiveNetworkPage: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<'all' | 'dns' | 'auth' | 'flows'>('all')
 
   const allConnections = [
-    ...(mockDeviceConnections['DEVICE-042'] || []),
+    ...(demoDeviceConnections['DEVICE-042'] || []),
     {
       id: 'conn-live-10',
       sourceIp: '10.0.0.1',

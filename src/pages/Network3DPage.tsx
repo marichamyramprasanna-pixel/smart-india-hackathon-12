@@ -1,6 +1,6 @@
 import React from 'react'
 import { NetworkTopologyCanvas } from '../components/network3d/NetworkTopologyCanvas'
-import { mock3DNodes, mock3DLinks } from '../api/network'
+import { demo3DNodes, demo3DLinks } from '../data/demo/network'
 import { Globe, ShieldCheck, Activity } from 'lucide-react'
 import { Badge } from '../components/common/Badge'
 
@@ -35,8 +35,8 @@ export const Network3DPage: React.FC = () => {
 
       {/* Large Full-Height 3D Topology Canvas */}
       <NetworkTopologyCanvas
-        nodes={mock3DNodes}
-        links={mock3DLinks}
+        nodes={demo3DNodes}
+        links={demo3DLinks}
         height="h-[calc(100vh-220px)] min-h-[580px]"
         enableFullscreen={true}
       />

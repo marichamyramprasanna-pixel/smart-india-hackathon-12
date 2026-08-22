@@ -85,15 +85,15 @@ export const DevicesPage: React.FC = () => {
   } = useForm<DeviceCreateInput>({
     resolver: zodResolver(deviceCreateSchema) as any,
     defaultValues: {
-      id: `DEVICE-${Math.floor(Math.random() * 900 + 100)}`,
-      hostname: 'SEC-WS-NEW.internal.corp',
-      ip_address: '10.0.4.150',
+      id: '',
+      hostname: '',
+      ip_address: '',
       device_type: 'Workstation',
-      department: 'Security Operations',
-      owner: 'SOC Operations',
+      department: '',
+      owner: '',
       status: 'HEALTHY',
-      risk_score: 5,
-      compromise_probability: 2,
+      risk_score: 0,
+      compromise_probability: 0,
     },
   })
 
@@ -118,7 +118,7 @@ export const DevicesPage: React.FC = () => {
               INVENTORY
             </span>
             <span className="text-xs font-mono text-slate-400">
-              1,248 Total Monitored Endpoints
+              {devices.length} Total Monitored Endpoints
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-100">

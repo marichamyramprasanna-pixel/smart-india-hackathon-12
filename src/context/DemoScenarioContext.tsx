@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { AttackTimelineEvent } from '../types/timeline'
 import { ThreatAlert } from '../types/threat'
-import { mockThreats } from '../api/threats'
+import { demoThreats } from '../data/demo/threats'
 import { trackEvent } from '../api/analytics'
 
 export interface DemoStage {
@@ -370,7 +370,7 @@ export const DemoScenarioProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const currentStage = useMemo(() => DEMO_STAGES_DATA[currentStageIndex] || DEMO_STAGES_DATA[0], [currentStageIndex])
 
   const threatsList = useMemo(() => {
-    return mockThreats.filter((t) => currentStage.activeAlertIds.includes(t.id))
+    return demoThreats.filter((t) => currentStage.activeAlertIds.includes(t.id))
   }, [currentStage.activeAlertIds])
 
   const setStageIndex = useCallback((index: number) => {

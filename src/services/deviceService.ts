@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { supabase, isSupabaseReady } from '../lib/supabase'
 import { handleSupabaseError } from '../lib/supabaseError'
 import { DeviceTelemetry } from '../types/device'
-import { mockDevices } from '../api/devices'
+import { demoDevices } from '../data/demo/devices'
+import { env } from '../config/env'
 import { Tables, InsertDto, UpdateDto } from '../types/database'
 
 // Validation Schemas using Zod
@@ -67,8 +68,8 @@ export const deviceService = {
     status?: string
     deviceType?: string
   }): Promise<{ data: DeviceTelemetry[]; error: string | null }> {
-    if (!isSupabaseReady()) {
-      let filtered = [...mockDevices]
+    if (!isSupabaseReady() && env.isDemoMode) {
+      let filtered = [...demoDevices]
       if (options?.search) {
         const q = options.search.toLowerCase()
         filtered = filtered.filter(
@@ -112,14 +113,14 @@ export const deviceService = {
 
       if (error) throw error
       if (!data || data.length === 0) {
-        // Graceful fallback to mock devices if database table is newly initialized and empty
-        return { data: mockDevices, error: null }
+        // Return isolated demo dataset when in demo mode, otherwise empty production array
+        return { data: env.isDemoMode ? demoDevices : [], error: null }
       }
 
       return { data: (data as Tables<'devices'>[]).map(mapRowToDevice), error: null }
     } catch (err) {
       const appErr = handleSupabaseError(err)
-      return { data: mockDevices, error: appErr.message }
+      return { data: env.isDemoMode ? demoDevices : [], error: appErr.message }
     }
   },
 
@@ -127,8 +128,8 @@ export const deviceService = {
    * READ: Fetch single device by ID
    */
   async getDeviceById(id: string): Promise<{ data: DeviceTelemetry | null; error: string | null }> {
-    if (!isSupabaseReady()) {
-      const found = mockDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
+    if (!isSupabaseReady() && env.isDemoMode) {
+      const found = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
       return { data: found, error: found ? null : 'Device not found' }
     }
 
@@ -141,15 +142,15 @@ export const deviceService = {
 
       if (error) throw error
       if (!data) {
-        const foundMock = mockDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
-        return { data: foundMock, error: null }
+        const foundDemo = env.isDemoMode ? (demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null) : null
+        return { data: foundDemo, error: foundDemo ? null : 'Device not found' }
       }
 
       return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
     } catch (err) {
       const appErr = handleSupabaseError(err)
-      const foundMock = mockDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
-      return { data: foundMock, error: appErr.message }
+      const foundDemo = env.isDemoMode ? (demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null) : null
+      return { data: foundDemo, error: appErr.message }
     }
   },
 
@@ -179,7 +180,7 @@ export const deviceService = {
     }
 
     if (!isSupabaseReady()) {
-      const newMock: DeviceTelemetry = {
+      const newDevice: DeviceTelemetry = {
         id: validData.id,
         hostname: validData.hostname,
         ip: validData.ip_address,
@@ -202,7 +203,7 @@ export const deviceService = {
         },
         isolationStatus: { isIsolated: false },
       }
-      return { data: newMock, error: null }
+      return { data: newDevice, error: null }
     }
 
     try {

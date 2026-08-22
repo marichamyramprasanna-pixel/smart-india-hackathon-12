@@ -27,8 +27,6 @@ import { Badge } from '../components/common/Badge'
 import { useSentinelAI } from '../context/SentinelAIContext'
 import { useInvestigation } from '../context/InvestigationContext'
 import { useDemoScenario } from '../context/DemoScenarioContext'
-import { mockDevices } from '../api/devices'
-import { mockThreats } from '../api/threats'
 
 export const AIChatPage: React.FC = () => {
   const navigate = useNavigate()

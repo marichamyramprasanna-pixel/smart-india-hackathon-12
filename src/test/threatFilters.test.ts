@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { mockThreats } from '../api/threats'
+import { demoThreats } from '../data/demo/threats'
 
 describe('Threat Management Filters', () => {
   it('contains AL-2041 critical command & control alert', () => {
-    const al2041 = mockThreats.find((t) => t.alertCode === 'AL-2041')
+    const al2041 = demoThreats.find((t) => t.alertCode === 'AL-2041')
     expect(al2041).toBeDefined()
     expect(al2041?.severity).toBe('CRITICAL')
     expect(al2041?.deviceId).toBe('DEVICE-042')
@@ -11,13 +11,13 @@ describe('Threat Management Filters', () => {
   })
 
   it('filters threats by severity accurately', () => {
-    const criticals = mockThreats.filter((t) => t.severity === 'CRITICAL')
+    const criticals = demoThreats.filter((t) => t.severity === 'CRITICAL')
     expect(criticals.length).toBeGreaterThanOrEqual(2)
     criticals.forEach((t) => expect(t.severity).toBe('CRITICAL'))
   })
 
   it('filters threats by device ID', () => {
-    const dev42Threats = mockThreats.filter((t) => t.deviceId === 'DEVICE-042')
+    const dev42Threats = demoThreats.filter((t) => t.deviceId === 'DEVICE-042')
     expect(dev42Threats.length).toBeGreaterThanOrEqual(3)
   })
 })

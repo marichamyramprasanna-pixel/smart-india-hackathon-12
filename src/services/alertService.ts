@@ -1,7 +1,8 @@
 import { supabase, isSupabaseReady } from '../lib/supabase'
 import { handleSupabaseError } from '../lib/supabaseError'
 import { ThreatAlert } from '../types/threat'
-import { mockThreats } from '../api/threats'
+import { demoThreats } from '../data/demo/threats'
+import { env } from '../config/env'
 import { Tables, UpdateDto } from '../types/database'
 
 function mapRowToAlert(row: Tables<'threat_alerts'>): ThreatAlert {
@@ -36,8 +37,8 @@ export const alertService = {
     search?: string
     deviceId?: string
   }): Promise<{ data: ThreatAlert[]; error: string | null }> {
-    if (!isSupabaseReady()) {
-      let filtered = [...mockThreats]
+    if (!isSupabaseReady() && env.isDemoMode) {
+      let filtered = [...demoThreats]
       if (filters?.severity && filters.severity !== 'ALL') {
         filtered = filtered.filter((t) => t.severity === filters.severity)
       }
@@ -87,13 +88,13 @@ export const alertService = {
       if (error) throw error
 
       if (!data || data.length === 0) {
-        return { data: mockThreats, error: null }
+        return { data: env.isDemoMode ? demoThreats : [], error: null }
       }
 
       return { data: (data as Tables<'threat_alerts'>[]).map(mapRowToAlert), error: null }
     } catch (err) {
       const appErr = handleSupabaseError(err)
-      return { data: mockThreats, error: appErr.message }
+      return { data: env.isDemoMode ? demoThreats : [], error: appErr.message }
     }
   },
 

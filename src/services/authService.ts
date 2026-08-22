@@ -1,5 +1,6 @@
 import { supabase, isSupabaseReady } from '../lib/supabase'
 import { handleSupabaseError } from '../lib/supabaseError'
+import { env } from '../config/env'
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 
 export interface AuthResponse {
@@ -14,15 +15,21 @@ export const authService = {
    */
   async signInWithPassword(email: string, password: string): Promise<AuthResponse> {
     if (!isSupabaseReady()) {
-      // Mock authenticated session for demo mode
+      if (env.isDemoMode) {
+        return {
+          user: {
+            id: 'demo-analyst-uuid',
+            email,
+            user_metadata: { full_name: 'Lead SOC Analyst', callsign: 'TACTICAL-01' },
+          } as any,
+          session: { access_token: 'demo-session-token' } as any,
+          error: null,
+        }
+      }
       return {
-        user: {
-          id: 'demo-analyst-uuid',
-          email,
-          user_metadata: { full_name: 'Agent Alex Rivera', callsign: 'SPECTRE-09' },
-        } as any,
-        session: { access_token: 'demo-session-token' } as any,
-        error: null,
+        user: null,
+        session: null,
+        error: 'Authentication service unavailable. Please configure Supabase credentials.',
       }
     }
 
@@ -49,14 +56,21 @@ export const authService = {
     metadata?: { full_name?: string; callsign?: string }
   ): Promise<AuthResponse> {
     if (!isSupabaseReady()) {
+      if (env.isDemoMode) {
+        return {
+          user: {
+            id: 'demo-analyst-uuid',
+            email,
+            user_metadata: metadata || {},
+          } as any,
+          session: { access_token: 'demo-session-token' } as any,
+          error: null,
+        }
+      }
       return {
-        user: {
-          id: 'demo-analyst-uuid',
-          email,
-          user_metadata: metadata || {},
-        } as any,
-        session: { access_token: 'demo-session-token' } as any,
-        error: null,
+        user: null,
+        session: null,
+        error: 'Registration service unavailable.',
       }
     }
 
@@ -100,16 +114,19 @@ export const authService = {
    */
   async getSession(): Promise<{ session: Session | null; error: string | null }> {
     if (!isSupabaseReady()) {
-      return {
-        session: {
-          user: {
-            id: 'demo-analyst-uuid',
-            email: 'analyst@sentinelx.security',
-            user_metadata: { full_name: 'Agent Alex Rivera', callsign: 'SPECTRE-09' },
-          },
-        } as any,
-        error: null,
+      if (env.isDemoMode) {
+        return {
+          session: {
+            user: {
+              id: 'demo-analyst-uuid',
+              email: 'analyst@sentinelx.security',
+              user_metadata: { full_name: 'Lead SOC Analyst', callsign: 'TACTICAL-01' },
+            },
+          } as any,
+          error: null,
+        }
       }
+      return { session: null, error: null }
     }
 
     try {

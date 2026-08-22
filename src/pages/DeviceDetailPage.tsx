@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Tabs,
@@ -14,23 +14,51 @@ import { ActiveConnectionsTable } from '../components/device/ActiveConnectionsTa
 import { RemediationActions } from '../components/device/RemediationActions'
 import { DeviceExplainability } from '../components/device/DeviceExplainability'
 import { AttackTimelineView } from '../components/timeline/AttackTimelineView'
-import { mockDevices, mockDeviceConnections } from '../api/devices'
+import { useDevices } from '../hooks/useDevices'
+import { demoDeviceConnections } from '../data/demo/devices'
 import { useSentinelAI } from '../context/SentinelAIContext'
 import { Button } from '../components/common/Button'
 import { ArrowLeft, ShieldAlert } from 'lucide-react'
+import { Skeleton } from '../components/common/Skeleton'
 
 export const DeviceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { setCurrentContext } = useSentinelAI()
+  const { devices, isLoading } = useDevices()
 
   const deviceId = id || 'DEVICE-042'
-  const device = mockDevices.find((d) => d.id.toLowerCase() === deviceId.toLowerCase()) || mockDevices[0]
-  const connections = mockDeviceConnections[device.id] || mockDeviceConnections['DEVICE-042'] || []
+  const device = devices.find((d) => d.id.toLowerCase() === deviceId.toLowerCase())
+  const connections = demoDeviceConnections[device?.id || 'DEVICE-042'] || []
 
   useEffect(() => {
-    setCurrentContext({ type: 'device', id: device.id, name: device.hostname })
+    if (device) {
+      setCurrentContext({ type: 'device', id: device.id, name: device.hostname })
+    }
   }, [device, setCurrentContext])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-6 w-36 rounded" />
+        <Skeleton className="h-44 w-full rounded-2xl" />
+        <Skeleton className="h-96 w-full rounded-2xl" />
+      </div>
+    )
+  }
+
+  if (!device) {
+    return (
+      <div className="py-20 text-center space-y-4">
+        <ShieldAlert className="h-12 w-12 text-slate-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-200">Device Endpoint Not Found</h2>
+        <p className="text-xs text-slate-400">The endpoint "{deviceId}" was not found in the inventory telemetry database.</p>
+        <Button variant="outline" size="sm" onClick={() => navigate('/devices')}>
+          Return to Device Inventory
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -68,57 +96,45 @@ export const DeviceDetailPage: React.FC = () => {
           <TabsTrigger value="auth">Authentication</TabsTrigger>
           <TabsTrigger value="connections">Sockets & Connections</TabsTrigger>
           <TabsTrigger value="ai-findings">AI Findings (Explainability)</TabsTrigger>
-          <TabsTrigger value="timeline">Host Timeline</TabsTrigger>
+          <TabsTrigger value="timeline">Attack Timeline</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Overview */}
-        <TabsContent value="overview" className="space-y-5 mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <DeviceExplainability />
+        {/* Tab 1: Overview Breakdown */}
+        <TabsContent value="overview" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DeviceTrafficChart />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <DnsEntropyChart />
-            <AuthAnomalyMatrix />
           </div>
-        </TabsContent>
-
-        {/* Tab 2: Network Traffic */}
-        <TabsContent value="network" className="space-y-5 mt-4">
-          <DeviceTrafficChart />
-          <ActiveConnectionsTable connections={connections} />
-        </TabsContent>
-
-        {/* Tab 3: DNS Behaviour */}
-        <TabsContent value="dns" className="space-y-5 mt-4">
-          <DnsEntropyChart />
-          <div className="p-4 rounded-xl border border-purple-500/30 bg-purple-950/20 text-xs text-purple-200">
-            <h4 className="font-mono font-bold text-purple-300 mb-1">
-              DNS DGA TUNNELING CORRELATION
-            </h4>
-            <p className="leading-relaxed">
-              DEVICE-042 generated 342 queries/min to pseudorandom dynamic domain names (*.tunnel-c2.biz) with an average Shannon entropy of 4.88. Normal workstation domain entropy baseline is 1.90. This indicates active C2 fallback and command tunneling.
-            </p>
-          </div>
-        </TabsContent>
-
-        {/* Tab 4: Authentication */}
-        <TabsContent value="auth" className="space-y-5 mt-4">
-          <AuthAnomalyMatrix />
-        </TabsContent>
-
-        {/* Tab 5: Connections */}
-        <TabsContent value="connections" className="space-y-5 mt-4">
-          <ActiveConnectionsTable connections={connections} />
-        </TabsContent>
-
-        {/* Tab 6: AI Findings */}
-        <TabsContent value="ai-findings" className="space-y-5 mt-4">
           <DeviceExplainability />
         </TabsContent>
 
-        {/* Tab 7: Timeline */}
-        <TabsContent value="timeline" className="space-y-5 mt-4">
+        {/* Tab 2: Network Traffic Telemetry */}
+        <TabsContent value="network" className="space-y-6 mt-4">
+          <DeviceTrafficChart />
+        </TabsContent>
+
+        {/* Tab 3: DNS Telemetry */}
+        <TabsContent value="dns" className="space-y-6 mt-4">
+          <DnsEntropyChart />
+        </TabsContent>
+
+        {/* Tab 4: Authentication Timing Matrix */}
+        <TabsContent value="auth" className="space-y-6 mt-4">
+          <AuthAnomalyMatrix />
+        </TabsContent>
+
+        {/* Tab 5: Active Sockets & NetFlow Connections */}
+        <TabsContent value="connections" className="space-y-6 mt-4">
+          <ActiveConnectionsTable connections={connections} />
+        </TabsContent>
+
+        {/* Tab 6: AI Behavioural Explainability */}
+        <TabsContent value="ai-findings" className="space-y-6 mt-4">
+          <DeviceExplainability />
+        </TabsContent>
+
+        {/* Tab 7: Attack Timeline Correlation */}
+        <TabsContent value="timeline" className="space-y-6 mt-4">
           <AttackTimelineView />
         </TabsContent>
       </Tabs>

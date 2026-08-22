@@ -50,10 +50,10 @@ export const LoginPage: React.FC = () => {
     handleSubmit: handleLoginSubmit,
     formState: { errors: loginErrors, isSubmitting: isLoginSubmitting },
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema) as any,
     defaultValues: {
-      email: 'analyst@sentinelx.security',
-      password: 'password123',
+      email: '',
+      password: '',
     },
   })
 
@@ -62,12 +62,12 @@ export const LoginPage: React.FC = () => {
     handleSubmit: handleSignupSubmit,
     formState: { errors: signupErrors, isSubmitting: isSignupSubmitting },
   } = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(signupSchema) as any,
     defaultValues: {
       email: '',
       password: '',
       fullName: '',
-      callsign: 'CYBER-OPS',
+      callsign: '',
     },
   })
 

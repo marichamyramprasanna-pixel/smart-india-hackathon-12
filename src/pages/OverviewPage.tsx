@@ -5,7 +5,7 @@ import { NetworkTopologyCanvas } from '../components/network3d/NetworkTopologyCa
 import { ThreatOverviewTable } from '../components/dashboard/ThreatOverviewTable'
 import { AIExplainabilityCard } from '../components/dashboard/AIExplainabilityCard'
 import { LiveEventFeed } from '../components/dashboard/LiveEventFeed'
-import { mock3DNodes, mock3DLinks } from '../api/network'
+import { demo3DNodes, demo3DLinks } from '../data/demo/network'
 
 export const OverviewPage: React.FC = () => {
   return (
@@ -23,10 +23,10 @@ export const OverviewPage: React.FC = () => {
             Interactive Network Topology (3D Spatial Telemetry)
           </h2>
           <span className="text-[11px] font-mono text-cyan-400">
-            10 Nodes • 10 Active Flows
+            {demo3DNodes.length} Nodes • {demo3DLinks.length} Active Flows
           </span>
         </div>
-        <NetworkTopologyCanvas nodes={mock3DNodes} links={mock3DLinks} height="h-[460px]" />
+        <NetworkTopologyCanvas nodes={demo3DNodes} links={demo3DLinks} height="h-[460px]" />
       </div>
 
       {/* 4. Two-Column Dashboard Split: Active Threats + AI Explainability Card */}
