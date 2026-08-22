@@ -1,0 +1,51 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { alertService } from '../services/alertService'
+import { ThreatAlert } from '../types/threat'
+
+export function useAlerts(filters?: {
+  severity?: string
+  status?: string
+  search?: string
+  deviceId?: string
+}) {
+  const queryClient = useQueryClient()
+
+  const alertsQuery = useQuery({
+    queryKey: ['alerts', filters],
+    queryFn: async () => {
+      const res = await alertService.getAlerts(filters)
+      if (res.error) throw new Error(res.error)
+      return res.data
+    },
+    staleTime: 1000 * 30, // 30 seconds
+  })
+
+  const updateAlertStatusMutation = useMutation({
+    mutationFn: async ({
+      alertId,
+      status,
+      analystName,
+    }: {
+      alertId: string
+      status: ThreatAlert['status']
+      analystName?: string
+    }) => {
+      const res = await alertService.updateStatus(alertId, status, analystName)
+      if (res.error) throw new Error(res.error)
+      return res.success
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] })
+    },
+  })
+
+  return {
+    alerts: alertsQuery.data || [],
+    isLoading: alertsQuery.isLoading,
+    isError: alertsQuery.isError,
+    error: alertsQuery.error instanceof Error ? alertsQuery.error.message : null,
+    refetch: alertsQuery.refetch,
+    updateStatus: updateAlertStatusMutation.mutateAsync,
+    isUpdating: updateAlertStatusMutation.isPending,
+  }
+}

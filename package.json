@@ -23,6 +23,7 @@
     "@radix-ui/react-tooltip": "^1.2.16",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
+    "@supabase/supabase-js": "^2.109.0",
     "@tanstack/react-query": "^5.101.4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/three": "^0.185.4",
@@ -51,11 +52,13 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.4",
     "jsdom": "^27.0.1",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "ws": "^8.21.3"
   }
 }

@@ -3,10 +3,13 @@ import { ThreatFilterBar } from '../components/threats/ThreatFilterBar'
 import { ThreatTable } from '../components/threats/ThreatTable'
 import { ThreatDetailModal } from '../components/threats/ThreatDetailModal'
 import { ThreatAlert } from '../types/threat'
-import { mockThreats } from '../api/threats'
+import { useAlerts } from '../hooks/useAlerts'
+import { useRealtimeAlerts } from '../hooks/useRealtimeAlerts'
 import { useDemoScenario } from '../context/DemoScenarioContext'
 import { Badge } from '../components/common/Badge'
-import { Flame, ShieldAlert } from 'lucide-react'
+import { Button } from '../components/common/Button'
+import { Skeleton } from '../components/common/Skeleton'
+import { Flame, ShieldAlert, RefreshCw, AlertCircle } from 'lucide-react'
 
 export const ThreatDetectionPage: React.FC = () => {
   const { currentStage } = useDemoScenario()
@@ -15,10 +18,19 @@ export const ThreatDetectionPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('ALL')
   const [selectedThreat, setSelectedThreat] = useState<ThreatAlert | null>(null)
 
-  // Use current active alerts from demo stage or full mock list
+  const { alerts, isLoading, isError, error, refetch, updateStatus } = useAlerts({
+    severity: selectedSeverity !== 'ALL' ? selectedSeverity : undefined,
+    status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+    search: searchQuery,
+  })
+
+  // Subscribe to Supabase Realtime changes
+  useRealtimeAlerts()
+
+  // Blend in active stage alerts
   const activeAlerts = useMemo(() => {
-    return mockThreats.filter((t) => currentStage.activeAlertIds.includes(t.id))
-  }, [currentStage.activeAlertIds])
+    return alerts.filter((t) => currentStage.activeAlertIds.includes(t.id) || currentStage.activeAlertIds.length === 0 || alerts.length <= 3)
+  }, [alerts, currentStage.activeAlertIds])
 
   const filteredThreats = useMemo(() => {
     return activeAlerts.filter((t) => {
@@ -29,7 +41,6 @@ export const ThreatDetectionPage: React.FC = () => {
         t.deviceIp.includes(searchQuery)
 
       if (!matchesQuery) return false
-
       if (selectedSeverity !== 'ALL' && t.severity !== selectedSeverity) return false
       if (selectedStatus !== 'ALL' && t.status !== selectedStatus) return false
       return true
@@ -58,6 +69,16 @@ export const ThreatDetectionPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="text-xs gap-1.5 border-slate-700"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Sync Alerts</span>
+          </Button>
+
           <Badge
             variant={activeAlerts.length > 0 ? 'critical' : 'healthy'}
             pulse={activeAlerts.length > 0}
@@ -79,11 +100,37 @@ export const ThreatDetectionPage: React.FC = () => {
         totalCount={filteredThreats.length}
       />
 
-      {/* Threat Alerts Table */}
-      <ThreatTable
-        threats={filteredThreats}
-        onSelectThreat={(t) => setSelectedThreat(t)}
-      />
+      {/* Error state */}
+      {isError && (
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-xs text-amber-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+            <span>{error || 'Unable to connect to Supabase alerts feed.'}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-7 text-xs border-amber-500/40">
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Threat Alerts Table or Loading Skeletons */}
+      {isLoading ? (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
+              <Skeleton className="h-5 w-24 rounded" />
+              <Skeleton className="h-5 w-48 rounded" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ThreatTable
+          threats={filteredThreats}
+          onSelectThreat={(t) => setSelectedThreat(t)}
+        />
+      )}
 
       {/* Deep Inspection Modal */}
       <ThreatDetailModal
