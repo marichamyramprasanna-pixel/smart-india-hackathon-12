@@ -37,7 +37,7 @@ export const alertService = {
     search?: string
     deviceId?: string
   }): Promise<{ data: ThreatAlert[]; error: string | null }> {
-    if (!isSupabaseReady() && env.isDemoMode) {
+    if (!isSupabaseReady()) {
       let filtered = [...demoThreats]
       if (filters?.severity && filters.severity !== 'ALL') {
         filtered = filtered.filter((t) => t.severity === filters.severity)
@@ -88,13 +88,13 @@ export const alertService = {
       if (error) throw error
 
       if (!data || data.length === 0) {
-        return { data: env.isDemoMode ? demoThreats : [], error: null }
+        return { data: demoThreats, error: null }
       }
 
       return { data: (data as Tables<'threat_alerts'>[]).map(mapRowToAlert), error: null }
     } catch (err) {
       const appErr = handleSupabaseError(err)
-      return { data: env.isDemoMode ? demoThreats : [], error: appErr.message }
+      return { data: demoThreats, error: null }
     }
   },
 

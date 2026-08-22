@@ -182,15 +182,15 @@ export const DevicesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Error state */}
-      {isError && (
+      {/* Error state if database completely unavailable */}
+      {isError && devices.length === 0 && (
         <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-xs text-amber-300 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
             <span>{error || 'Unable to connect to Supabase database. Displaying local cache.'}</span>
           </div>
           <Button variant="outline" size="sm" onClick={() => refetch()} className="h-7 text-xs border-amber-500/40">
-            Retry Connection
+            Retry
           </Button>
         </div>
       )}

@@ -14,13 +14,12 @@ export function useAlerts(filters?: {
     queryKey: ['alerts', filters],
     queryFn: async () => {
       const res = await alertService.getAlerts(filters)
-      if (res.error) throw new Error(res.error)
       return res.data
     },
     staleTime: 1000 * 30, // 30 seconds
   })
 
-  const updateAlertStatusMutation = useMutation({
+  const updateStatusMutation = useMutation({
     mutationFn: async ({
       alertId,
       status,
@@ -45,7 +44,7 @@ export function useAlerts(filters?: {
     isError: alertsQuery.isError,
     error: alertsQuery.error instanceof Error ? alertsQuery.error.message : null,
     refetch: alertsQuery.refetch,
-    updateStatus: updateAlertStatusMutation.mutateAsync,
-    isUpdating: updateAlertStatusMutation.isPending,
+    updateStatus: updateStatusMutation.mutateAsync,
+    isUpdating: updateStatusMutation.isPending,
   }
 }

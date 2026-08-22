@@ -100,8 +100,8 @@ export const ThreatDetectionPage: React.FC = () => {
         totalCount={filteredThreats.length}
       />
 
-      {/* Error state */}
-      {isError && (
+      {/* Error state if database completely unavailable */}
+      {isError && alerts.length === 0 && (
         <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-xs text-amber-300 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />

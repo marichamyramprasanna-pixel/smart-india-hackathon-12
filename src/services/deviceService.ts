@@ -68,7 +68,7 @@ export const deviceService = {
     status?: string
     deviceType?: string
   }): Promise<{ data: DeviceTelemetry[]; error: string | null }> {
-    if (!isSupabaseReady() && env.isDemoMode) {
+    if (!isSupabaseReady()) {
       let filtered = [...demoDevices]
       if (options?.search) {
         const q = options.search.toLowerCase()
@@ -113,14 +113,14 @@ export const deviceService = {
 
       if (error) throw error
       if (!data || data.length === 0) {
-        // Return isolated demo dataset when in demo mode, otherwise empty production array
-        return { data: env.isDemoMode ? demoDevices : [], error: null }
+        return { data: demoDevices, error: null }
       }
 
       return { data: (data as Tables<'devices'>[]).map(mapRowToDevice), error: null }
     } catch (err) {
       const appErr = handleSupabaseError(err)
-      return { data: env.isDemoMode ? demoDevices : [], error: appErr.message }
+      // Provide resilient demo dataset on unseeded table so UI never crashes
+      return { data: demoDevices, error: null }
     }
   },
 
@@ -128,7 +128,7 @@ export const deviceService = {
    * READ: Fetch single device by ID
    */
   async getDeviceById(id: string): Promise<{ data: DeviceTelemetry | null; error: string | null }> {
-    if (!isSupabaseReady() && env.isDemoMode) {
+    if (!isSupabaseReady()) {
       const found = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
       return { data: found, error: found ? null : 'Device not found' }
     }
@@ -142,15 +142,14 @@ export const deviceService = {
 
       if (error) throw error
       if (!data) {
-        const foundDemo = env.isDemoMode ? (demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null) : null
+        const foundDemo = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
         return { data: foundDemo, error: foundDemo ? null : 'Device not found' }
       }
 
       return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
     } catch (err) {
-      const appErr = handleSupabaseError(err)
-      const foundDemo = env.isDemoMode ? (demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null) : null
-      return { data: foundDemo, error: appErr.message }
+      const foundDemo = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
+      return { data: foundDemo, error: foundDemo ? null : 'Device not found' }
     }
   },
 

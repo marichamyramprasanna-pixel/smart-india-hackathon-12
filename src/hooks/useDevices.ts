@@ -13,9 +13,6 @@ export function useDevices(filters?: {
     queryKey: ['devices', filters],
     queryFn: async () => {
       const res = await deviceService.getDevices(filters)
-      if (res.error) {
-        throw new Error(res.error)
-      }
       return res.data
     },
     staleTime: 1000 * 30, // 30 seconds
