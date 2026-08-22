@@ -28,6 +28,7 @@ export interface AIChatRequestPayload {
   context: {
     type: 'device' | 'threat' | 'network' | 'global'
     id?: string
+    name?: string
   }
   conversation_id: string
 }
