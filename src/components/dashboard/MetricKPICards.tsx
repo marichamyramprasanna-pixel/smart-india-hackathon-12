@@ -10,19 +10,30 @@ import {
   Info,
 } from 'lucide-react'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
+import { useDevices } from '../../hooks/useDevices'
+import { useAlerts } from '../../hooks/useAlerts'
 import { Card } from '../common/Card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../common/Tooltip'
-import { formatCompactNumber } from '../../utils/formatters'
 
 export const MetricKPICards: React.FC = () => {
   const { currentStage } = useDemoScenario()
+  const { devices } = useDevices()
+  const { alerts } = useAlerts()
+
+  const activeDeviceCount = devices.length
+  const suspiciousCount = devices.filter(
+    (d) => d.status === 'SUSPICIOUS' || d.status === 'COMPROMISED'
+  ).length || currentStage.suspiciousDevicesCount
+  const activeAlertCount = alerts.filter(
+    (a) => a.status === 'NEW' || a.status === 'INVESTIGATING'
+  ).length || currentStage.activeThreatsCount
 
   const metrics = [
     {
       id: 'kpi-active-devs',
       label: 'Active Monitored Devices',
-      value: '1,248',
-      trend: '+14 today',
+      value: activeDeviceCount > 0 ? activeDeviceCount.toString() : '0',
+      trend: `${activeDeviceCount} endpoints`,
       isPositiveTrend: true,
       icon: <Laptop className="h-4 w-4 text-cyan-400" />,
       tooltip: 'Continuous telemetry agents and passive flow sensors monitored across all corporate subnets.',
@@ -31,9 +42,9 @@ export const MetricKPICards: React.FC = () => {
     {
       id: 'kpi-suspicious-devs',
       label: 'Suspicious Endpoints',
-      value: currentStage.suspiciousDevicesCount.toString(),
-      trend: currentStage.suspiciousDevicesCount > 0 ? '+4 flagged' : '0 nominal',
-      isPositiveTrend: currentStage.suspiciousDevicesCount === 0,
+      value: suspiciousCount.toString(),
+      trend: suspiciousCount > 0 ? `+${suspiciousCount} flagged` : '0 nominal',
+      isPositiveTrend: suspiciousCount === 0,
       icon: <AlertTriangle className="h-4 w-4 text-orange-400" />,
       tooltip: 'Endpoints with statistical behavioral deviations exceeding 2.5 standard deviations from baselines.',
       accent: 'border-orange-500/30 text-orange-400',
@@ -41,9 +52,9 @@ export const MetricKPICards: React.FC = () => {
     {
       id: 'kpi-active-threats',
       label: 'Active Threats',
-      value: currentStage.activeThreatsCount.toString(),
-      trend: currentStage.activeThreatsCount > 0 ? 'Elevated' : 'None',
-      isPositiveTrend: currentStage.activeThreatsCount === 0,
+      value: activeAlertCount.toString(),
+      trend: activeAlertCount > 0 ? 'Elevated' : 'None',
+      isPositiveTrend: activeAlertCount === 0,
       icon: <Flame className="h-4 w-4 text-red-400" />,
       tooltip: 'Correlated multi-vector security incidents requiring SOC analyst triage or containment.',
       accent: 'border-red-500/30 text-red-400',
@@ -61,58 +72,61 @@ export const MetricKPICards: React.FC = () => {
     {
       id: 'kpi-ai-confidence',
       label: 'AI Detection Confidence',
-      value: '96.4%',
-      trend: '48 Classifiers',
+      value: `${Math.round(100 - (currentStage.compromiseProbability * 0.05))}%`,
+      trend: 'Calibrated',
       isPositiveTrend: true,
       icon: <BrainCircuit className="h-4 w-4 text-purple-400" />,
-      tooltip: 'Model calibration probability over 30 days of continuous multivariate unsupervised learning.',
+      tooltip: 'Bayesian posterior confidence calibrated across continuous multivariate unsupervised learning models.',
       accent: 'border-purple-500/20 text-purple-400',
     },
   ]
 
   return (
-    <TooltipProvider>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+    <TooltipProvider delayDuration={200}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {metrics.map((m) => (
           <Card
             key={m.id}
             variant="cyber"
-            className="p-3.5 sm:p-4 rounded-xl relative overflow-hidden group hover:border-cyan-500/40 transition-all duration-200"
+            className="p-3.5 rounded-xl flex flex-col justify-between space-y-2 hover:border-cyan-500/40 transition-colors"
           >
-            <div className="flex items-center justify-between">
-              <span className="p-2 rounded-lg bg-slate-900 border border-slate-800 group-hover:border-cyan-500/40 transition-colors">
-                {m.icon}
-              </span>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button className="text-slate-500 hover:text-slate-300 p-1" aria-label="Metric details">
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-xs">
-                  {m.tooltip}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-
-            <div className="mt-3">
+            {/* Top row: Label + Icon + Tooltip */}
+            <div className="flex items-start justify-between gap-2">
               <span className="text-[11px] font-medium text-slate-400 line-clamp-1">
                 {m.label}
               </span>
-              <div className="mt-1 flex items-baseline justify-between">
-                <span className="text-xl sm:text-2xl font-display font-bold text-slate-100 font-mono-numbers">
-                  {m.value}
-                </span>
+              <div className="flex items-center gap-1 shrink-0">
+                {m.icon}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="text-slate-500 hover:text-slate-300" aria-label="Metric Info">
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    {m.tooltip}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
-            <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono">
-              <span className={m.isPositiveTrend ? 'text-emerald-400 flex items-center gap-0.5' : 'text-red-400 flex items-center gap-0.5'}>
-                {m.isPositiveTrend ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {/* Bottom Row: Dynamic Value + Trend indicator */}
+            <div className="flex items-baseline justify-between pt-1">
+              <span className="text-xl sm:text-2xl font-mono font-bold text-slate-100 tracking-tight">
+                {m.value}
+              </span>
+              <span
+                className={`text-[10px] font-mono font-medium flex items-center gap-0.5 ${
+                  m.isPositiveTrend ? 'text-emerald-400' : 'text-orange-400'
+                }`}
+              >
+                {m.isPositiveTrend ? (
+                  <TrendingUp className="h-2.5 w-2.5" />
+                ) : (
+                  <TrendingDown className="h-2.5 w-2.5" />
+                )}
                 {m.trend}
               </span>
-              <span className="text-slate-500">Live</span>
             </div>
           </Card>
         ))}

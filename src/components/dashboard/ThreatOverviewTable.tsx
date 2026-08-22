@@ -55,7 +55,7 @@ export const ThreatOverviewTable: React.FC = () => {
           <div className="py-10 text-center text-xs text-slate-400">
             <CheckCircle className="mx-auto h-8 w-8 text-emerald-400/60 mb-2" />
             <p className="font-semibold text-slate-200">No active threats detected</p>
-            <p className="text-[11px] text-slate-500 mt-1">All 1,248 monitored endpoints are within normal parameters.</p>
+            <p className="text-[11px] text-slate-500 mt-1">All monitored network endpoints are operating within normal baseline parameters.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

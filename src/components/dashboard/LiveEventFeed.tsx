@@ -18,10 +18,10 @@ interface LiveEvent {
 export const LiveEventFeed: React.FC = () => {
   const { currentStage } = useDemoScenario()
   const [isPaused, setIsPaused] = useState(false)
-  const [events, setEvents] = useState<LiveEvent[]>([
+  const [events, setEvents] = useState<LiveEvent[]>(() => [
     {
       id: 'evt-1',
-      time: '09:25:12',
+      time: new Date(Date.now() - 5000).toLocaleTimeString(),
       source: '10.0.4.42:51200',
       destination: '10.0.2.7:445',
       proto: 'SMB',
@@ -31,7 +31,7 @@ export const LiveEventFeed: React.FC = () => {
     },
     {
       id: 'evt-2',
-      time: '09:24:50',
+      time: new Date(Date.now() - 15000).toLocaleTimeString(),
       source: '10.0.4.42:53102',
       destination: '10.0.0.2:53',
       proto: 'DNS',
@@ -41,7 +41,7 @@ export const LiveEventFeed: React.FC = () => {
     },
     {
       id: 'evt-3',
-      time: '09:24:15',
+      time: new Date(Date.now() - 35000).toLocaleTimeString(),
       source: '10.0.4.42:49821',
       destination: '185.220.101.5:443',
       proto: 'TLS',
@@ -51,7 +51,7 @@ export const LiveEventFeed: React.FC = () => {
     },
     {
       id: 'evt-4',
-      time: '09:23:40',
+      time: new Date(Date.now() - 55000).toLocaleTimeString(),
       source: '10.0.4.118:58210',
       destination: '10.0.0.1:443',
       proto: 'HTTPS',
@@ -61,7 +61,7 @@ export const LiveEventFeed: React.FC = () => {
     },
     {
       id: 'evt-5',
-      time: '09:23:05',
+      time: new Date(Date.now() - 85000).toLocaleTimeString(),
       source: '10.0.8.109:554',
       destination: '10.0.2.20:554',
       proto: 'RTSP',
