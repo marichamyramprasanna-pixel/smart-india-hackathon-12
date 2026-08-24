@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge'
 import { Button } from '../components/common/Button'
 import { AIExplainabilityCard } from '../components/dashboard/AIExplainabilityCard'
+import { BehavioralEngineLab } from '../components/ai/BehavioralEngineLab'
 import { useDemoScenario } from '../context/DemoScenarioContext'
 import { useSentinelAI } from '../context/SentinelAIContext'
 import { useNavigate } from 'react-router-dom'
@@ -25,7 +26,7 @@ export const AIAnalysisPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-xl border border-purple-500/30 bg-purple-950/20 backdrop-blur-xl shadow-purple-glow">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl border border-purple-500/40 bg-purple-950/20 backdrop-blur-xl shadow-purple-glow">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
@@ -58,10 +59,13 @@ export const AIAnalysisPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Main Explainability Card */}
+      {/* 1. Main Interactive Mathematical Behavioral Engine Lab */}
+      <BehavioralEngineLab />
+
+      {/* 2. Main Live Explainability Card */}
       <AIExplainabilityCard />
 
-      {/* Model Architectures & Feature Extraction Grid */}
+      {/* 3. Model Architectures & Feature Extraction Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Card variant="cyber" className="p-4 rounded-xl space-y-2">
           <div className="flex items-center justify-between">
