@@ -32,6 +32,9 @@ type SettingsFormValues = z.infer<typeof settingsSchema>
 export const SettingsPage: React.FC = () => {
   const [isSaved, setIsSaved] = useState(false)
 
+  const savedSettingsRaw = typeof window !== 'undefined' ? localStorage.getItem('sentinelx_settings') : null
+  const savedSettings = savedSettingsRaw ? JSON.parse(savedSettingsRaw) : null
+
   const {
     register,
     handleSubmit,
@@ -40,7 +43,7 @@ export const SettingsPage: React.FC = () => {
     formState: { errors, isSubmitting },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: {
+    defaultValues: savedSettings || {
       analystName: productConfig.brand.analyst.name,
       callsign: productConfig.brand.analyst.callsign,
       anomalyThreshold: 85,
@@ -54,7 +57,8 @@ export const SettingsPage: React.FC = () => {
   const autoQuarantine = watch('autoQuarantineCritical')
 
   const onSubmit = async (data: SettingsFormValues) => {
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    localStorage.setItem('sentinelx_settings', JSON.stringify(data))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     setIsSaved(true)
     setTimeout(() => setIsSaved(false), 4000)
   }

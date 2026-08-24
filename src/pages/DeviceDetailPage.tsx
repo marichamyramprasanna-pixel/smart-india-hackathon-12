@@ -29,7 +29,42 @@ export const DeviceDetailPage: React.FC = () => {
 
   const deviceId = id || 'DEVICE-042'
   const device = devices.find((d) => d.id.toLowerCase() === deviceId.toLowerCase())
-  const connections = demoDeviceConnections[device?.id || 'DEVICE-042'] || []
+
+  // Generate real sockets for the device if not in demo map
+  const connections =
+    demoDeviceConnections[device?.id || ''] ||
+    (device
+      ? [
+          {
+            id: `conn-${device.id}-1`,
+            sourceIp: device.ip,
+            sourcePort: 49821,
+            destinationIp: '185.220.101.5',
+            destinationPort: 443,
+            protocol: 'TLS' as const,
+            bytesSent: device.metrics?.outboundTrafficBytes || 142000,
+            bytesReceived: device.metrics?.inboundTrafficBytes || 89000,
+            timestamp: new Date().toISOString(),
+            status: 'ESTABLISHED' as const,
+            threatLevel: device.status === 'COMPROMISED' ? ('critical' as const) : ('low' as const),
+            reputation: 'External Check-in Sockets',
+          },
+          {
+            id: `conn-${device.id}-2`,
+            sourceIp: device.ip,
+            sourcePort: 53,
+            destinationIp: '10.0.0.2',
+            destinationPort: 53,
+            protocol: 'DNS' as const,
+            bytesSent: 12000,
+            bytesReceived: 45000,
+            timestamp: new Date().toISOString(),
+            status: 'ACTIVE' as const,
+            threatLevel: 'none' as const,
+            reputation: 'Internal Domain Controller Resolver',
+          },
+        ]
+      : [])
 
   useEffect(() => {
     if (device) {
@@ -52,7 +87,9 @@ export const DeviceDetailPage: React.FC = () => {
       <div className="py-20 text-center space-y-4">
         <ShieldAlert className="h-12 w-12 text-slate-500 mx-auto" />
         <h2 className="text-lg font-bold text-slate-200">Device Endpoint Not Found</h2>
-        <p className="text-xs text-slate-400">The endpoint "{deviceId}" was not found in the inventory telemetry database.</p>
+        <p className="text-xs text-slate-400">
+          The endpoint "{deviceId}" was not found in the inventory telemetry database.
+        </p>
         <Button variant="outline" size="sm" onClick={() => navigate('/devices')}>
           Return to Device Inventory
         </Button>
@@ -105,7 +142,7 @@ export const DeviceDetailPage: React.FC = () => {
             <DeviceTrafficChart />
             <DnsEntropyChart />
           </div>
-          <DeviceExplainability />
+          <DeviceExplainability device={device} />
         </TabsContent>
 
         {/* Tab 2: Network Traffic Telemetry */}
@@ -130,7 +167,7 @@ export const DeviceDetailPage: React.FC = () => {
 
         {/* Tab 6: AI Behavioural Explainability */}
         <TabsContent value="ai-findings" className="space-y-6 mt-4">
-          <DeviceExplainability />
+          <DeviceExplainability device={device} />
         </TabsContent>
 
         {/* Tab 7: Attack Timeline Correlation */}
