@@ -25,10 +25,20 @@ export const DeviceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { setCurrentContext } = useSentinelAI()
-  const { devices, isLoading } = useDevices()
+  const { devices, isLoading, deleteDevice } = useDevices()
 
   const deviceId = id || 'DEVICE-042'
   const device = devices.find((d) => d.id.toLowerCase() === deviceId.toLowerCase())
+
+  const handleDeleteDevice = async () => {
+    if (!device) return
+    try {
+      await deleteDevice(device.id)
+      navigate('/devices')
+    } catch {
+      // Handled
+    }
+  }
 
   // Generate real sockets for the device if not in demo map
   const connections =
@@ -115,7 +125,7 @@ export const DeviceDetailPage: React.FC = () => {
       </div>
 
       {/* 1. Device Host Header */}
-      <DeviceHeader device={device} />
+      <DeviceHeader device={device} onDelete={handleDeleteDevice} />
 
       {/* 2. Remediation & Incident Response Playbook Strip */}
       <RemediationActions

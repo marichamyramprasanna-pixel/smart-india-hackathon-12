@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   AlertCircle,
+  Trash2,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
 import { Badge } from '../components/common/Badge'
@@ -22,20 +23,30 @@ import { Skeleton } from '../components/common/Skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/common/Dialog'
 import { useDevices } from '../hooks/useDevices'
 import { useInvestigation } from '../context/InvestigationContext'
-import { useDemoScenario } from '../context/DemoScenarioContext'
 import { deviceCreateSchema, DeviceCreateInput } from '../services/deviceService'
+import { DeviceTelemetry } from '../types/device'
 
 export const DevicesPage: React.FC = () => {
   const navigate = useNavigate()
   const { isDeviceIsolated } = useInvestigation()
-  const { currentStage } = useDemoScenario()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const [deviceToDelete, setDeviceToDelete] = useState<DeviceTelemetry | null>(null)
 
-  const { devices, isLoading, isError, error, refetch, createDevice, isCreating } = useDevices({
+  const {
+    devices,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    createDevice,
+    isCreating,
+    deleteDevice,
+    isDeleting,
+  } = useDevices({
     search: searchQuery,
     deviceType: typeFilter !== 'ALL' ? typeFilter : undefined,
   })
@@ -83,6 +94,16 @@ export const DevicesPage: React.FC = () => {
       reset()
     } catch (err: any) {
       setAddError(err.message || 'Failed to insert device record into Supabase')
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deviceToDelete) return
+    try {
+      await deleteDevice(deviceToDelete.id)
+      setDeviceToDelete(null)
+    } catch (err) {
+      // Handled
     }
   }
 
@@ -249,7 +270,7 @@ export const DevicesPage: React.FC = () => {
                 <div className="text-xs text-slate-300 space-y-1">
                   <p className="text-[11px] text-slate-400 truncate">{dev.hostname}</p>
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Dept: <strong className="text-slate-300">{dev.department}</strong></span>
+                    <span>Dept: <strong className="text-slate-300">{dev.department || '—'}</strong></span>
                     <span>OS: <strong className="text-slate-300">{dev.type}</strong></span>
                   </div>
                 </div>
@@ -265,24 +286,87 @@ export const DevicesPage: React.FC = () => {
                     </span>
                   </div>
 
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      navigate(`/devices/${dev.id}`)
-                    }}
-                    className="h-7 px-2.5 text-xs font-semibold gap-1"
-                  >
-                    <span>Investigate</span>
-                    <ArrowUpRight className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    {/* Delete Device Button */}
+                    <button
+                      type="button"
+                      title={`Delete ${dev.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeviceToDelete(dev)
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-red-400 hover:border-red-500/40 hover:bg-red-950/30 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/devices/${dev.id}`)
+                      }}
+                      className="h-7 px-2.5 text-xs font-semibold gap-1"
+                    >
+                      <span>Investigate</span>
+                      <ArrowUpRight className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             )
           })}
         </div>
       )}
+
+      {/* Delete Device Confirmation Dialog */}
+      <Dialog open={!!deviceToDelete} onOpenChange={(open) => !open && setDeviceToDelete(null)}>
+        <DialogContent className="max-w-md bg-slate-950 border-slate-800">
+          <DialogHeader className="border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2 text-red-400 mb-1">
+              <Trash2 className="h-5 w-5" />
+              <DialogTitle className="text-base text-slate-100">Delete Monitored Endpoint</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-400">
+              Are you sure you want to permanently delete{' '}
+              <strong className="text-slate-200 font-mono">{deviceToDelete?.id}</strong> (
+              <span className="font-mono text-cyan-300">{deviceToDelete?.hostname}</span>)?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3 text-xs text-slate-300 space-y-2">
+            <p>
+              This will remove all associated behavioral telemetry, NetFlow history, and AI baseline models for this device from Supabase.
+            </p>
+            <div className="p-3 rounded-lg bg-red-950/30 border border-red-500/30 text-red-300 text-[11px]">
+              ⚠️ This action cannot be undone.
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeviceToDelete(null)}
+              disabled={isDeleting}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmDelete}
+              isLoading={isDeleting}
+              className="text-xs font-semibold gap-1.5 shadow-red-glow-sm"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Confirm Delete</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Register Endpoint Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -306,6 +390,7 @@ export const DevicesPage: React.FC = () => {
               <input
                 type="text"
                 {...register('id')}
+                placeholder="e.g. DEVICE-099"
                 className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
               />
               {errors.id && <p className="text-red-400 mt-0.5 text-[10px]">{errors.id.message}</p>}
@@ -316,6 +401,7 @@ export const DevicesPage: React.FC = () => {
               <input
                 type="text"
                 {...register('hostname')}
+                placeholder="e.g. FIN-WS-099"
                 className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
               />
               {errors.hostname && <p className="text-red-400 mt-0.5 text-[10px]">{errors.hostname.message}</p>}
@@ -327,6 +413,7 @@ export const DevicesPage: React.FC = () => {
                 <input
                   type="text"
                   {...register('ip_address')}
+                  placeholder="e.g. 10.0.4.99"
                   className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
                 />
                 {errors.ip_address && <p className="text-red-400 mt-0.5 text-[10px]">{errors.ip_address.message}</p>}
@@ -353,6 +440,7 @@ export const DevicesPage: React.FC = () => {
                 <input
                   type="text"
                   {...register('department')}
+                  placeholder="e.g. Finance"
                   className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                 />
               </div>
@@ -362,6 +450,7 @@ export const DevicesPage: React.FC = () => {
                 <input
                   type="text"
                   {...register('owner')}
+                  placeholder="e.g. Alice Doe"
                   className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                 />
               </div>
