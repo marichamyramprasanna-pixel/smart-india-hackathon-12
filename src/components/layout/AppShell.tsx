@@ -7,6 +7,7 @@ import { LiveThreatTicker } from './LiveThreatTicker'
 import { CommandPalette } from './CommandPalette'
 import { CyberCursor } from '../common/CyberCursor'
 import { ScrollEffects } from '../common/ScrollEffects'
+import { ScrollVelocityBeam } from '../common/ScrollVelocityBeam'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 
@@ -78,6 +79,9 @@ export const AppShell: React.FC = () => {
 
       {/* Dynamic Scroll Progress & Floating Top Button */}
       <ScrollEffects />
+
+      {/* Holographic Scroll Velocity Laser Beam & Parallax HUD */}
+      <ScrollVelocityBeam />
     </div>
   )
 }
