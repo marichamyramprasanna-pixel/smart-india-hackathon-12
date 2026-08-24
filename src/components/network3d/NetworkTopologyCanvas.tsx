@@ -1,6 +1,6 @@
-import React, { useState, Suspense, lazy } from 'react'
+import React, { useState, useRef, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { OrbitControls, Stars, Grid } from '@react-three/drei'
 import {
   RotateCcw,
   Layers,
@@ -10,6 +10,12 @@ import {
   Eye,
   Shield,
   Activity,
+  Play,
+  Pause,
+  Compass,
+  Sliders,
+  Maximize2,
+  Sparkles,
 } from 'lucide-react'
 import { Network3DNode, Network3DLink } from '../../types/network'
 import { NetworkNodes } from './NetworkNodes'
@@ -18,7 +24,6 @@ import { NodeDetailsDrawer } from './NodeDetailsDrawer'
 import { Network2DFallback } from './Network2DFallback'
 import { Button } from '../common/Button'
 import { Badge } from '../common/Badge'
-import { Skeleton } from '../common/Skeleton'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
 
 interface NetworkTopologyCanvasProps {
@@ -31,21 +36,30 @@ interface NetworkTopologyCanvasProps {
 export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   nodes,
   links,
-  height = 'h-[540px]',
+  height = 'h-[620px]',
 }) => {
   const { currentStage } = useDemoScenario()
+  const controlsRef = useRef<any>(null)
+
   const [selectedNode, setSelectedNode] = useState<Network3DNode | null>(null)
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d')
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const [autoRotate, setAutoRotate] = useState(true)
+  const [packetSpeed, setPacketSpeed] = useState<number>(1)
+  const [cameraPreset, setCameraPreset] = useState<'overview' | 'threat' | 'top'>('overview')
 
   // Sync node statuses dynamically with DemoScenario state
   const reactiveNodes = nodes.map((n) => {
     if (n.id === 'DEVICE-042') {
       return {
         ...n,
-        status: currentStage.device42Status === 'COMPROMISED' ? ('COMPROMISED' as const) :
-                currentStage.device42Status === 'SUSPICIOUS' ? ('SUSPICIOUS' as const) : ('HEALTHY' as const),
+        status:
+          currentStage.device42Status === 'COMPROMISED'
+            ? ('COMPROMISED' as const)
+            : currentStage.device42Status === 'SUSPICIOUS'
+            ? ('SUSPICIOUS' as const)
+            : ('HEALTHY' as const),
         riskScore: currentStage.device42Risk,
         compromiseProbability: currentStage.compromiseProbability,
       }
@@ -53,7 +67,10 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
     if (n.id === 'SERVER-07') {
       return {
         ...n,
-        status: currentStage.server07Status === 'SUSPICIOUS' ? ('SUSPICIOUS' as const) : ('HEALTHY' as const),
+        status:
+          currentStage.server07Status === 'SUSPICIOUS'
+            ? ('SUSPICIOUS' as const)
+            : ('HEALTHY' as const),
         riskScore: currentStage.server07Risk,
       }
     }
@@ -69,89 +86,148 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
 
     if (!matchesSearch) return false
 
-    if (filterType === 'threats') return node.status === 'COMPROMISED' || node.status === 'SUSPICIOUS'
-    if (filterType === 'endpoints') return node.type === 'workstation' || node.type === 'laptop'
-    if (filterType === 'infrastructure') return node.type === 'firewall' || node.type === 'router' || node.type === 'server'
+    if (filterType === 'threats')
+      return node.status === 'COMPROMISED' || node.status === 'SUSPICIOUS'
+    if (filterType === 'endpoints')
+      return node.type === 'workstation' || node.type === 'laptop'
+    if (filterType === 'infrastructure')
+      return (
+        node.type === 'firewall' || node.type === 'router' || node.type === 'server'
+      )
     return true
   })
 
+  const setCameraAngle = (preset: 'overview' | 'threat' | 'top') => {
+    setCameraPreset(preset)
+    if (!controlsRef.current) return
+
+    if (preset === 'overview') {
+      controlsRef.current.object.position.set(0, 10, 24)
+      controlsRef.current.target.set(0, 0, 0)
+    } else if (preset === 'threat') {
+      // Focus on DEVICE-042 position
+      controlsRef.current.object.position.set(4, 5, 10)
+      controlsRef.current.target.set(2, 0, 0)
+    } else if (preset === 'top') {
+      controlsRef.current.object.position.set(0, 32, 0)
+      controlsRef.current.target.set(0, 0, 0)
+    }
+    controlsRef.current.update()
+  }
+
   return (
-    <div className={`relative w-full ${height} rounded-xl border border-slate-800 bg-slate-950/80 backdrop-blur-xl overflow-hidden shadow-2xl flex flex-col`}>
-      {/* Top Toolbar Controls */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-auto">
-        <div className="flex items-center gap-2">
-          {/* Search bar inside canvas */}
+    <div
+      className={`relative w-full ${height} rounded-2xl border border-cyan-500/30 bg-gradient-to-b from-slate-950/90 to-[#020617] backdrop-blur-2xl overflow-hidden shadow-2xl flex flex-col`}
+    >
+      {/* Top Floating Cyber Toolbar */}
+      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 pointer-events-auto bg-slate-950/85 p-2.5 rounded-xl border border-slate-800/80 backdrop-blur-md shadow-xl">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search bar inside 3D canvas */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-cyan-400" />
             <input
               type="text"
-              placeholder="Search 3D topology..."
+              placeholder="Filter 3D node ID or IP..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 w-36 sm:w-48 rounded-md border border-slate-800 bg-slate-900/90 pl-8 pr-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+              className="h-8 w-36 sm:w-52 rounded-lg border border-slate-700 bg-slate-900/90 pl-8 pr-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 shadow-inner"
             />
           </div>
 
-          {/* Filter Chips */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-900/80 p-1 rounded-md border border-slate-800 text-xs">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                filterType === 'all' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              All Nodes ({reactiveNodes.length})
-            </button>
-            <button
-              onClick={() => setFilterType('threats')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                filterType === 'threats' ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Threats
-            </button>
-            <button
-              onClick={() => setFilterType('endpoints')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                filterType === 'endpoints' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Endpoints
-            </button>
+          {/* Category Filter Chips */}
+          <div className="hidden sm:flex items-center gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 text-xs">
+            {[
+              { key: 'all', label: `All (${reactiveNodes.length})` },
+              { key: 'threats', label: 'Threats', color: 'text-red-400' },
+              { key: 'endpoints', label: 'Endpoints', color: 'text-blue-400' },
+              { key: 'infrastructure', label: 'Core Infra', color: 'text-cyan-400' },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilterType(f.key)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                  filterType === f.key
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-neon-cyan/20 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* View Switcher & Legend */}
+        {/* Camera Presets, Auto-Rotate & Mode Switcher */}
         <div className="flex items-center gap-2">
-          {/* Legend */}
-          <div className="hidden md:flex items-center gap-2.5 px-2.5 py-1 rounded-md bg-slate-900/80 border border-slate-800 text-[10px] font-mono">
-            <span className="flex items-center gap-1 text-cyan-400">
-              <span className="h-2 w-2 rounded-full bg-cyan-400" /> Healthy
-            </span>
-            <span className="flex items-center gap-1 text-orange-400">
-              <span className="h-2 w-2 rounded-full bg-orange-400" /> Suspicious
-            </span>
-            <span className="flex items-center gap-1 text-red-400">
-              <span className="h-2 w-2 rounded-full bg-red-400 animate-ping" /> Compromised
-            </span>
-          </div>
-
-          <div className="flex items-center rounded-md bg-slate-900/80 border border-slate-800 p-0.5">
+          {/* Camera Preset Buttons */}
+          <div className="hidden lg:flex items-center gap-1 bg-slate-900/80 p-0.5 rounded-lg border border-slate-800 text-xs font-mono">
             <button
-              onClick={() => setViewMode('3d')}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                viewMode === '3d' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-cyan-glow-sm' : 'text-slate-400 hover:text-slate-200'
+              onClick={() => setCameraAngle('overview')}
+              className={`px-2 py-1 rounded text-[10px] ${
+                cameraPreset === 'overview'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              3D Space
+              Orbit
+            </button>
+            <button
+              onClick={() => setCameraAngle('threat')}
+              className={`px-2 py-1 rounded text-[10px] ${
+                cameraPreset === 'threat'
+                  ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Focus Threat
+            </button>
+            <button
+              onClick={() => setCameraAngle('top')}
+              className={`px-2 py-1 rounded text-[10px] ${
+                cameraPreset === 'top'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Top-Down
+            </button>
+          </div>
+
+          {/* Auto Rotate Toggle */}
+          <button
+            onClick={() => setAutoRotate((prev) => !prev)}
+            className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+              autoRotate
+                ? 'border-cyan-500/50 bg-cyan-950/60 text-cyan-300 shadow-neon-cyan/20'
+                : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Toggle 3D Cinematic Auto-Rotation"
+          >
+            {autoRotate ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            <span className="hidden xl:inline text-[11px]">Auto Orbit</span>
+          </button>
+
+          {/* 3D vs 2D Switcher */}
+          <div className="flex items-center rounded-lg bg-slate-900/90 border border-slate-800 p-0.5">
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                viewMode === '3d'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-neon-cyan/20'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              3D WebGL
             </button>
             <button
               onClick={() => setViewMode('2d')}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                viewMode === '2d' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-cyan-glow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                viewMode === '2d'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-neon-cyan/20'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              2D Flat
+              2D Matrix
             </button>
           </div>
         </div>
@@ -163,24 +239,50 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
           <Suspense
             fallback={
               <div className="flex h-full w-full items-center justify-center bg-slate-950">
-                <div className="text-center space-y-2">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent mx-auto" />
-                  <p className="text-xs text-slate-400">Initializing 3D Telemetry WebGL Canvas...</p>
+                <div className="text-center space-y-3">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent mx-auto shadow-neon-cyan" />
+                  <p className="text-xs font-mono text-cyan-300">
+                    Initializing High-Fidelity 3D WebGL Cyber Canvas...
+                  </p>
                 </div>
               </div>
             }
           >
             <Canvas
-              camera={{ position: [0, 8, 22], fov: 45 }}
+              camera={{ position: [0, 10, 24], fov: 45 }}
               className="w-full h-full"
             >
-              {/* Lighting */}
-              <ambientLight intensity={0.65} />
-              <pointLight position={[10, 15, 10]} intensity={1.2} color="#00F0FF" />
-              <pointLight position={[-10, -10, -10]} intensity={0.8} color="#A855F7" />
+              {/* Studio Cyber Lighting */}
+              <ambientLight intensity={0.7} />
+              <pointLight position={[15, 20, 15]} intensity={1.5} color="#00F0FF" />
+              <pointLight position={[-15, -15, -15]} intensity={1.2} color="#A855F7" />
+              <pointLight position={[0, -10, 20]} intensity={0.8} color="#10B981" />
+              <directionalLight position={[0, 15, 5]} intensity={0.6} />
 
-              {/* Starfield backdrop */}
-              <Stars radius={100} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
+              {/* Starfield Backdrop */}
+              <Stars
+                radius={120}
+                depth={60}
+                count={4000}
+                factor={4}
+                saturation={0.5}
+                fade
+                speed={1.5}
+              />
+
+              {/* Cyber Grid Plane Floor */}
+              <Grid
+                position={[0, -6, 0]}
+                args={[40, 40]}
+                cellSize={1.5}
+                cellThickness={0.8}
+                cellColor="#06b6d4"
+                sectionSize={4.5}
+                sectionThickness={1.2}
+                sectionColor="#a855f7"
+                fadeDistance={35}
+                fadeStrength={1.5}
+              />
 
               {/* 3D Network Topology Components */}
               <NetworkNodes
@@ -191,14 +293,17 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
 
               <PacketStreams nodes={reactiveNodes} links={links} />
 
-              {/* Controls */}
+              {/* Orbit Controls with Smooth Damping & Auto-Rotation */}
               <OrbitControls
+                ref={controlsRef}
                 enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
-                maxDistance={40}
-                minDistance={5}
-                dampingFactor={0.08}
+                autoRotate={autoRotate}
+                autoRotateSpeed={1.0}
+                maxDistance={50}
+                minDistance={4}
+                dampingFactor={0.06}
               />
             </Canvas>
           </Suspense>
@@ -212,17 +317,30 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
         )}
       </div>
 
-      {/* Bottom status bar in Canvas */}
-      <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 pointer-events-none text-[11px] font-mono text-slate-400 bg-slate-950/80 px-3 py-1 rounded-md border border-slate-800/80">
-        <span className="inline-block h-2 w-2 rounded-full bg-cyan-400" />
-        <span>R3F Interactive Graph | Drag to rotate • Scroll to zoom • Click node to triage</span>
+      {/* Floating Status & Interactive Legend Bar */}
+      <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-300 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800/80 shadow-xl backdrop-blur-md">
+          <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+          <span>
+            WebGL Active • Orbit: Drag • Zoom: Scroll • Triage: Click any 3D Node
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800/80 text-[10px] font-mono backdrop-blur-md shadow-xl">
+          <span className="flex items-center gap-1 text-cyan-400">
+            <span className="h-2 w-2 rounded-full bg-cyan-400" /> Healthy
+          </span>
+          <span className="flex items-center gap-1 text-amber-400">
+            <span className="h-2 w-2 rounded-full bg-amber-400" /> Suspicious
+          </span>
+          <span className="flex items-center gap-1 text-red-400 font-bold">
+            <span className="h-2 w-2 rounded-full bg-red-400 animate-ping" /> Compromised (Patient Zero)
+          </span>
+        </div>
       </div>
 
       {/* Slide-out Node Investigation Drawer */}
-      <NodeDetailsDrawer
-        node={selectedNode}
-        onClose={() => setSelectedNode(null)}
-      />
+      <NodeDetailsDrawer node={selectedNode} onClose={() => setSelectedNode(null)} />
     </div>
   )
 }
