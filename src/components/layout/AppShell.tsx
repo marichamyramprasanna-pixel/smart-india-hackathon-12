@@ -5,6 +5,7 @@ import { Topbar } from './Topbar'
 import { DemoControllerBar } from './DemoControllerBar'
 import { LiveThreatTicker } from './LiveThreatTicker'
 import { CommandPalette } from './CommandPalette'
+import { CyberCursor } from '../common/CyberCursor'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 
@@ -70,6 +71,9 @@ export const AppShell: React.FC = () => {
 
       {/* Floating Sentinel AI Assistant Chat Window */}
       <SentinelAIChat />
+
+      {/* Cyber Reticle & Laser Follower Cursor Effect */}
+      <CyberCursor />
     </div>
   )
 }
