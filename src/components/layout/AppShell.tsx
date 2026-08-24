@@ -6,6 +6,7 @@ import { DemoControllerBar } from './DemoControllerBar'
 import { LiveThreatTicker } from './LiveThreatTicker'
 import { CommandPalette } from './CommandPalette'
 import { CyberCursor } from '../common/CyberCursor'
+import { ScrollEffects } from '../common/ScrollEffects'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 
@@ -74,6 +75,9 @@ export const AppShell: React.FC = () => {
 
       {/* Cyber Reticle & Laser Follower Cursor Effect */}
       <CyberCursor />
+
+      {/* Dynamic Scroll Progress & Floating Top Button */}
+      <ScrollEffects />
     </div>
   )
 }
