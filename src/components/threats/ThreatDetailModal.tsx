@@ -1,6 +1,14 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldAlert, ArrowUpRight, Lock, CheckCircle, BrainCircuit, ExternalLink } from 'lucide-react'
+import {
+  ShieldAlert,
+  ArrowUpRight,
+  Lock,
+  CheckCircle,
+  BrainCircuit,
+  ExternalLink,
+  Check,
+} from 'lucide-react'
 import { ThreatAlert } from '../../types/threat'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../common/Dialog'
 import { Badge } from '../common/Badge'
@@ -14,7 +22,7 @@ interface ThreatDetailModalProps {
 
 export const ThreatDetailModal: React.FC<ThreatDetailModalProps> = ({ threat, onClose }) => {
   const navigate = useNavigate()
-  const { isolateDevice, isDeviceIsolated } = useInvestigation()
+  const { isolateDevice, isDeviceIsolated, blockIp, isIpBlocked } = useInvestigation()
 
   if (!threat) return null
 
@@ -56,14 +64,51 @@ export const ThreatDetailModal: React.FC<ThreatDetailModalProps> = ({ threat, on
           </div>
 
           <div>
-            <h4 className="font-mono text-[11px] text-slate-400 uppercase font-semibold mb-1.5">Correlated IoCs</h4>
-            <div className="grid grid-cols-2 gap-2">
-              {threat.indicators.map((ioc, idx) => (
-                <div key={idx} className="p-2 rounded bg-slate-900 border border-slate-800">
-                  <span className="text-[10px] font-mono text-cyan-400 font-bold">{ioc.type}</span>
-                  <p className="font-mono text-slate-200 truncate">{ioc.value}</p>
-                </div>
-              ))}
+            <h4 className="font-mono text-[11px] text-slate-400 uppercase font-semibold mb-1.5">
+              Correlated Evidence & Bad IoCs
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {threat.indicators.map((ioc, idx) => {
+                const isIp = ioc.type === 'IP' || /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ioc.value)
+                const blocked = isIp ? isIpBlocked(ioc.value) : false
+
+                return (
+                  <div
+                    key={idx}
+                    className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase block">
+                        {ioc.type}
+                      </span>
+                      <p className="font-mono font-bold text-slate-100 truncate mt-0.5">
+                        {ioc.value}
+                      </p>
+                      <span className="text-[10px] text-slate-400 truncate block">
+                        {ioc.reputation}
+                      </span>
+                    </div>
+
+                    {isIp && !ioc.value.startsWith('10.') && (
+                      <Button
+                        variant={blocked ? 'secondary' : 'destructive'}
+                        size="sm"
+                        onClick={() => blockIp(ioc.value, `Malicious IP in alert ${threat.alertCode}`)}
+                        disabled={blocked}
+                        className="h-6 px-2 text-[10px] font-mono shrink-0"
+                      >
+                        {blocked ? (
+                          <span className="flex items-center gap-0.5 text-emerald-400">
+                            <Check className="h-3 w-3" /> Blocked
+                          </span>
+                        ) : (
+                          'Block IP'
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

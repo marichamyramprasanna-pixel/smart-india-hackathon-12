@@ -10,12 +10,15 @@ import {
   CheckCircle,
   Clock,
   Zap,
+  Lock,
+  Check,
 } from 'lucide-react'
 import { ThreatAlert } from '../../types/threat'
 import { Badge } from '../common/Badge'
 import { Button } from '../common/Button'
 import { Card } from '../common/Card'
 import { useSentinelAI } from '../../context/SentinelAIContext'
+import { useInvestigation } from '../../context/InvestigationContext'
 
 interface ThreatTableProps {
   threats: ThreatAlert[]
@@ -25,6 +28,7 @@ interface ThreatTableProps {
 export const ThreatTable: React.FC<ThreatTableProps> = ({ threats, onSelectThreat }) => {
   const navigate = useNavigate()
   const { toggleOpen, sendMessage, setCurrentContext } = useSentinelAI()
+  const { blockIp, isIpBlocked } = useInvestigation()
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({ 'AL-2041': true })
   const [sortField, setSortField] = useState<keyof ThreatAlert>('confidenceScore')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -232,22 +236,50 @@ export const ThreatTable: React.FC<ThreatTableProps> = ({ threats, onSelectThrea
                                 Correlated Evidence & IoCs:
                               </span>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                                {threat.indicators.map((ioc, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="p-2 rounded-lg bg-slate-950 border border-slate-800 text-[11px]"
-                                  >
-                                    <span className="font-mono text-[9px] text-cyan-400 font-bold uppercase block">
-                                      {ioc.type}
-                                    </span>
-                                    <p className="font-mono font-medium text-slate-200 truncate mt-0.5">
-                                      {ioc.value}
-                                    </p>
-                                    <span className="text-[10px] text-slate-400 mt-0.5 block truncate">
-                                      {ioc.reputation}
-                                    </span>
-                                  </div>
-                                ))}
+                                {threat.indicators.map((ioc, idx) => {
+                                  const isIp = ioc.type === 'IP' || /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ioc.value)
+                                  const blocked = isIp ? isIpBlocked(ioc.value) : false
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] flex flex-col justify-between space-y-1.5 hover:border-slate-700 transition-colors"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-mono text-[9px] text-cyan-400 font-bold uppercase block">
+                                          {ioc.type}
+                                        </span>
+                                        {isIp && !ioc.value.startsWith('10.') && (
+                                          <Button
+                                            variant={blocked ? 'secondary' : 'destructive'}
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              blockIp(ioc.value, `Malicious IP in alert ${threat.alertCode}`)
+                                            }}
+                                            disabled={blocked}
+                                            className="h-5 px-1.5 text-[9px] font-mono"
+                                          >
+                                            {blocked ? (
+                                              <span className="flex items-center gap-0.5 text-emerald-400">
+                                                <Check className="h-2.5 w-2.5" /> Blocked
+                                              </span>
+                                            ) : (
+                                              'Block IP'
+                                            )}
+                                          </Button>
+                                        )}
+                                      </div>
+
+                                      <p className="font-mono font-bold text-slate-100 truncate">
+                                        {ioc.value}
+                                      </p>
+                                      <span className="text-[10px] text-slate-400 truncate block">
+                                        {ioc.reputation}
+                                      </span>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
 
