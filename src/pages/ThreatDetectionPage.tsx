@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react'
 import { ThreatFilterBar } from '../components/threats/ThreatFilterBar'
 import { ThreatTable } from '../components/threats/ThreatTable'
 import { ThreatDetailModal } from '../components/threats/ThreatDetailModal'
+import { MitreAttackMatrix } from '../components/threats/MitreAttackMatrix'
+import { FirewallRuleGeneratorModal } from '../components/threats/FirewallRuleGeneratorModal'
+import { AttackSimulationDrawer } from '../components/threats/AttackSimulationDrawer'
 import { ThreatAlert } from '../types/threat'
 import { useAlerts } from '../hooks/useAlerts'
 import { useRealtimeAlerts } from '../hooks/useRealtimeAlerts'
@@ -9,7 +12,7 @@ import { useDemoScenario } from '../context/DemoScenarioContext'
 import { Badge } from '../components/common/Badge'
 import { Button } from '../components/common/Button'
 import { Skeleton } from '../components/common/Skeleton'
-import { Flame, ShieldAlert, RefreshCw, AlertCircle } from 'lucide-react'
+import { Flame, ShieldAlert, RefreshCw, AlertCircle, Zap, Shield, Terminal } from 'lucide-react'
 
 export const ThreatDetectionPage: React.FC = () => {
   const { currentStage } = useDemoScenario()
@@ -17,6 +20,8 @@ export const ThreatDetectionPage: React.FC = () => {
   const [selectedSeverity, setSelectedSeverity] = useState('ALL')
   const [selectedStatus, setSelectedStatus] = useState('ALL')
   const [selectedThreat, setSelectedThreat] = useState<ThreatAlert | null>(null)
+  const [isFirewallModalOpen, setIsFirewallModalOpen] = useState(false)
+  const [isSimulationDrawerOpen, setIsSimulationDrawerOpen] = useState(false)
 
   const { alerts, isLoading, isError, error, refetch, updateStatus } = useAlerts({
     severity: selectedSeverity !== 'ALL' ? selectedSeverity : undefined,
@@ -45,7 +50,7 @@ export const ThreatDetectionPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-xl border border-slate-800 bg-slate-950/80 backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl border border-slate-800 bg-slate-950/80 backdrop-blur-xl shadow-2xl">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-300 border border-red-500/40">
@@ -63,7 +68,29 @@ export const ThreatDetectionPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Attack Injector Lab Button */}
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setIsSimulationDrawerOpen(true)}
+            className="text-xs gap-1.5 font-semibold shadow-red-glow-sm"
+          >
+            <Zap className="h-3.5 w-3.5 fill-current" />
+            <span>Red Team Simulator</span>
+          </Button>
+
+          {/* Firewall Script Generator Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFirewallModalOpen(true)}
+            className="text-xs gap-1.5 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/40"
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span>Generate ACL Rules</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -73,14 +100,6 @@ export const ThreatDetectionPage: React.FC = () => {
             <RefreshCw className="h-3.5 w-3.5" />
             <span>Sync Alerts</span>
           </Button>
-
-          <Badge
-            variant={alerts.length > 0 ? 'critical' : 'healthy'}
-            pulse={alerts.length > 0}
-            className="font-mono text-xs"
-          >
-            {alerts.length} ACTIVE ALERTS
-          </Badge>
         </div>
       </div>
 
@@ -127,10 +146,27 @@ export const ThreatDetectionPage: React.FC = () => {
         />
       )}
 
+      {/* MITRE ATT&CK Enterprise Tactical Matrix */}
+      <MitreAttackMatrix />
+
       {/* Deep Inspection Modal */}
       <ThreatDetailModal
         threat={selectedThreat}
         onClose={() => setSelectedThreat(null)}
+      />
+
+      {/* Multi-Platform Firewall Rule Generator Modal */}
+      <FirewallRuleGeneratorModal
+        isOpen={isFirewallModalOpen}
+        onClose={() => setIsFirewallModalOpen(false)}
+        targetIp={selectedThreat?.deviceIp || '185.220.101.5'}
+        reason={selectedThreat?.title || 'Perimeter Block for Persistent C2 Beaconing'}
+      />
+
+      {/* Red Team Attack Simulator Drawer */}
+      <AttackSimulationDrawer
+        isOpen={isSimulationDrawerOpen}
+        onClose={() => setIsSimulationDrawerOpen(false)}
       />
     </div>
   )
