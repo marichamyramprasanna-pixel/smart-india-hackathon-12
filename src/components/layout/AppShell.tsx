@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { DemoControllerBar } from './DemoControllerBar'
+import { LiveThreatTicker } from './LiveThreatTicker'
 import { CommandPalette } from './CommandPalette'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
@@ -48,6 +49,9 @@ export const AppShell: React.FC = () => {
           onOpenSidebar={() => setSidebarOpen(true)}
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         />
+
+        {/* Live Marquee Broadcast Ticker */}
+        <LiveThreatTicker />
 
         {/* Demo Scenario Controller Bar */}
         <DemoControllerBar />
