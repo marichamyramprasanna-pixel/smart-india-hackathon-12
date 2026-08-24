@@ -15,6 +15,7 @@ import {
   RefreshCw,
   AlertCircle,
   Trash2,
+  Download,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
 import { Badge } from '../components/common/Badge'
@@ -97,13 +98,39 @@ export const DevicesPage: React.FC = () => {
     }
   }
 
+  const handleExportCsv = () => {
+    const headers = ['ID', 'Hostname', 'IP Address', 'Type', 'Department', 'Owner', 'Status', 'Risk Score', 'Compromise Prob', 'Isolated']
+    const rows = filteredDevices.map((d) => [
+      d.id,
+      d.hostname,
+      d.ip,
+      d.type,
+      `"${d.department || ''}"`,
+      `"${d.owner || ''}"`,
+      d.status,
+      d.riskScore || 0,
+      d.compromiseProbability || 0,
+      isDeviceIsolated(d.id) ? 'YES' : 'NO'
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `sentinelx-devices-inventory-${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   const handleConfirmDelete = async () => {
     if (!deviceToDelete) return
     try {
       await deleteDevice(deviceToDelete.id)
       setDeviceToDelete(null)
-    } catch (err) {
-      // Handled
+    } catch {
+      // Handled in mutation
     }
   }
 
@@ -128,7 +155,18 @@ export const DevicesPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            className="text-xs gap-1.5 border-slate-700 hover:border-cyan-500/40"
+            title="Download full inventory as CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Export CSV</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
