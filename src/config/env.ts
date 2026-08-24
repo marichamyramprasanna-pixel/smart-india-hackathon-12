@@ -1,17 +1,18 @@
 /**
  * Environment configuration module
- * Connects frontend directly to Supabase backend & OpenRouter LLM.
+ * Connects frontend directly to Supabase PostgREST Data API & OpenRouter LLM.
  * Sourced securely from environment variables.
  */
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://cgkdtqtrbkrcmymzvuaa.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_vpI3rBVolg6-h1KTcUAjbQ_fM59c454'
 const openrouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY || ''
 const openrouterModel = import.meta.env.VITE_OPENROUTER_MODEL || 'openai/gpt-4o-mini'
 const isProd = import.meta.env.PROD
 
 export const env = {
   supabaseUrl,
+  supabaseRestUrl: `${supabaseUrl.replace(/\/$/, '')}/rest/v1`,
   supabaseAnonKey,
   openrouterApiKey,
   openrouterModel,
