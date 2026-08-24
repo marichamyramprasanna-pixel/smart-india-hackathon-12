@@ -1,125 +1,137 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef } from 'react'
 
 export const CyberCursor: React.FC = () => {
-  const [position, setPosition] = useState({ x: -100, y: -100 })
-  const [trailingPos, setTrailingPos] = useState({ x: -100, y: -100 })
-  const [isHovered, setIsHovered] = useState(false)
-  const [isClicking, setIsClicking] = useState(false)
-  const [isVisible, setIsVisible] = useState(false)
+  const dotRef = useRef<HTMLDivElement>(null)
+  const ringRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Only enable on non-touch devices
+    // Check if device is touch-only
     if (typeof window === 'undefined' || window.matchMedia('(pointer: coarse)').matches) {
       return
     }
 
-    const handleMouseMove = (e: MouseEvent) => {
-      setIsVisible(true)
-      setPosition({ x: e.clientX, y: e.clientY })
-    }
+    let mouseX = -100
+    let mouseY = -100
+    let ringX = -100
+    let ringY = -100
+    let isHovered = false
+    let isClicking = false
+    let isVisible = false
+    let animationFrameId: number
 
-    const handleMouseDown = () => setIsClicking(true)
-    const handleMouseUp = () => setIsClicking(false)
-    const handleMouseLeave = () => setIsVisible(false)
+    const onMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX
+      mouseY = e.clientY
+      if (!isVisible) {
+        isVisible = true
+        if (dotRef.current) dotRef.current.style.opacity = '1'
+        if (ringRef.current) ringRef.current.style.opacity = '1'
+      }
 
-    // Check hover targets (buttons, links, inputs, cards)
-    const handleMouseOver = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (
-        target.closest('button') ||
-        target.closest('a') ||
-        target.closest('input') ||
-        target.closest('select') ||
-        target.closest('textarea') ||
-        target.closest('[role="button"]') ||
-        target.closest('.cursor-pointer')
-      ) {
-        setIsHovered(true)
-      } else {
-        setIsHovered(false)
+      // Check if hovering over clickable targets
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const clickable = target.closest(
+          'button, a, input, select, textarea, [role="button"], .cursor-pointer, [data-interactive]'
+        )
+        isHovered = Boolean(clickable)
       }
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mousedown', handleMouseDown)
-    window.addEventListener('mouseup', handleMouseUp)
-    window.addEventListener('mouseleave', handleMouseLeave)
-    window.addEventListener('mouseover', handleMouseOver)
+    const onMouseDown = () => {
+      isClicking = true
+    }
+
+    const onMouseUp = () => {
+      isClicking = false
+    }
+
+    const onMouseLeave = () => {
+      isVisible = false
+      if (dotRef.current) dotRef.current.style.opacity = '0'
+      if (ringRef.current) ringRef.current.style.opacity = '0'
+    }
+
+    const onMouseEnter = () => {
+      isVisible = true
+      if (dotRef.current) dotRef.current.style.opacity = '1'
+      if (ringRef.current) ringRef.current.style.opacity = '1'
+    }
+
+    // High-performance GPU render loop (Zero React re-renders)
+    const renderLoop = () => {
+      // Spring interpolation for smooth trailing
+      ringX += (mouseX - ringX) * 0.2
+      ringY += (mouseY - ringY) * 0.2
+
+      if (dotRef.current) {
+        dotRef.current.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0) translate(-50%, -50%) scale(${
+          isClicking ? 1.6 : isHovered ? 1.3 : 1
+        })`
+        dotRef.current.style.backgroundColor = isClicking ? '#EF4444' : isHovered ? '#00F0FF' : '#38BDF8'
+        dotRef.current.style.boxShadow = isClicking
+          ? '0 0 10px 2px rgba(239, 68, 68, 0.9)'
+          : isHovered
+          ? '0 0 12px 3px rgba(0, 240, 255, 0.9)'
+          : '0 0 8px 2px rgba(56, 189, 248, 0.6)'
+      }
+
+      if (ringRef.current) {
+        const ringScale = isClicking ? 1.4 : isHovered ? 1.35 : 1
+        ringRef.current.style.transform = `translate3d(${ringX}px, ${ringY}px, 0) translate(-50%, -50%) scale(${ringScale})`
+        ringRef.current.style.borderColor = isClicking
+          ? 'rgba(239, 68, 68, 0.85)'
+          : isHovered
+          ? 'rgba(0, 240, 255, 0.85)'
+          : 'rgba(56, 189, 248, 0.35)'
+        ringRef.current.style.backgroundColor = isClicking
+          ? 'rgba(239, 68, 68, 0.12)'
+          : isHovered
+          ? 'rgba(0, 240, 255, 0.1)'
+          : 'transparent'
+      }
+
+      animationFrameId = requestAnimationFrame(renderLoop)
+    }
+
+    window.addEventListener('mousemove', onMouseMove, { passive: true })
+    window.addEventListener('mousedown', onMouseDown, { passive: true })
+    window.addEventListener('mouseup', onMouseUp, { passive: true })
+    window.addEventListener('mouseleave', onMouseLeave)
+    window.addEventListener('mouseenter', onMouseEnter)
+
+    animationFrameId = requestAnimationFrame(renderLoop)
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mousedown', handleMouseDown)
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('mouseleave', handleMouseLeave)
-      window.removeEventListener('mouseover', handleMouseOver)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('mouseleave', onMouseLeave)
+      window.removeEventListener('mouseenter', onMouseEnter)
+      cancelAnimationFrame(animationFrameId)
     }
   }, [])
 
-  // Smooth lerp trailing animation
-  useEffect(() => {
-    let animationFrameId: number
-
-    const updateTrailing = () => {
-      setTrailingPos((prev) => {
-        const dx = position.x - prev.x
-        const dy = position.y - prev.y
-        return {
-          x: prev.x + dx * 0.22,
-          y: prev.y + dy * 0.22,
-        }
-      })
-      animationFrameId = requestAnimationFrame(updateTrailing)
-    }
-
-    animationFrameId = requestAnimationFrame(updateTrailing)
-    return () => cancelAnimationFrame(animationFrameId)
-  }, [position])
-
-  if (!isVisible) return null
-
   return (
-    <>
-      {/* 1. Precise Laser Dot Target */}
+    <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden select-none" aria-hidden="true">
+      {/* 1. Precision Center Laser Dot */}
       <div
-        className="pointer-events-none fixed z-[9999] -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform duration-75 ease-out"
+        ref={dotRef}
+        className="pointer-events-none fixed left-0 top-0 h-1.5 w-1.5 rounded-full opacity-0 will-change-transform"
         style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: isClicking ? '10px' : isHovered ? '6px' : '4px',
-          height: isClicking ? '10px' : isHovered ? '6px' : '4px',
-          backgroundColor: isClicking ? '#EF4444' : isHovered ? '#00F0FF' : '#38BDF8',
-          boxShadow: isClicking
-            ? '0 0 12px 3px rgba(239, 68, 68, 0.9)'
-            : isHovered
-            ? '0 0 12px 3px rgba(0, 240, 255, 0.9)'
-            : '0 0 8px 2px rgba(56, 189, 248, 0.7)',
+          transition: 'opacity 0.2s ease, background-color 0.15s ease, box-shadow 0.15s ease',
         }}
       />
 
-      {/* 2. Fluid Cyber Reticle / Trailing Aura Ring */}
+      {/* 2. Fluid Cyber Reticle Aura Ring */}
       <div
-        className="pointer-events-none fixed z-[9998] -translate-x-1/2 -translate-y-1/2 rounded-full border transition-all duration-150 ease-out"
+        ref={ringRef}
+        className="pointer-events-none fixed left-0 top-0 h-6 w-6 rounded-full border border-cyan-400/40 opacity-0 will-change-transform"
         style={{
-          left: `${trailingPos.x}px`,
-          top: `${trailingPos.y}px`,
-          width: isClicking ? '44px' : isHovered ? '36px' : '24px',
-          height: isClicking ? '44px' : isHovered ? '36px' : '24px',
-          borderColor: isClicking
-            ? 'rgba(239, 68, 68, 0.8)'
-            : isHovered
-            ? 'rgba(0, 240, 255, 0.8)'
-            : 'rgba(56, 189, 248, 0.35)',
-          backgroundColor: isClicking
-            ? 'rgba(239, 68, 68, 0.15)'
-            : isHovered
-            ? 'rgba(0, 240, 255, 0.12)'
-            : 'rgba(6, 182, 212, 0.03)',
-          boxShadow: isHovered
-            ? '0 0 20px -2px rgba(0, 240, 255, 0.4), inset 0 0 10px rgba(0, 240, 255, 0.2)'
-            : '0 0 10px -2px rgba(56, 189, 248, 0.2)',
-          backdropFilter: isHovered ? 'blur(1px)' : 'none',
+          transition: 'opacity 0.2s ease, border-color 0.15s ease, background-color 0.15s ease',
+          boxShadow: '0 0 12px -2px rgba(0, 240, 255, 0.35)',
         }}
       />
-    </>
+    </div>
   )
 }
