@@ -16,12 +16,14 @@ import {
   AlertCircle,
   Trash2,
   Download,
+  Radar,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
 import { Badge } from '../components/common/Badge'
 import { Button } from '../components/common/Button'
 import { Skeleton } from '../components/common/Skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/common/Dialog'
+import { DeviceCollectorModal } from '../components/device/DeviceCollectorModal'
 import { useDevices } from '../hooks/useDevices'
 import { useInvestigation } from '../context/InvestigationContext'
 import { deviceCreateSchema, DeviceCreateInput } from '../services/deviceService'
@@ -34,6 +36,7 @@ export const DevicesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isCollectorModalOpen, setIsCollectorModalOpen] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [deviceToDelete, setDeviceToDelete] = useState<DeviceTelemetry | null>(null)
 
@@ -156,6 +159,17 @@ export const DevicesPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Subnet Collector & Scanner Trigger */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsCollectorModalOpen(true)}
+            className="text-xs gap-1.5 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/40 shadow-neon-cyan/20"
+          >
+            <Radar className="h-3.5 w-3.5 animate-pulse" />
+            <span>Device Collector</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -505,6 +519,12 @@ export const DevicesPage: React.FC = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Subnet Scanner & Telemetry Collector Modal */}
+      <DeviceCollectorModal
+        isOpen={isCollectorModalOpen}
+        onClose={() => setIsCollectorModalOpen(false)}
+      />
     </div>
   )
 }
