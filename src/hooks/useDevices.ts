@@ -15,7 +15,9 @@ export function useDevices(filters?: {
       const res = await deviceService.getDevices(filters)
       return res.data
     },
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 30,        // treat data fresh for 30s
+    refetchInterval: 1000 * 30,  // auto-refresh every 30s in background
+    refetchIntervalInBackground: false,
   })
 
   const createDeviceMutation = useMutation({

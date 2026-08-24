@@ -1,7 +1,41 @@
 import { AIChatRequestPayload, AIChatResponsePayload } from '../types/ai'
 import { env } from '../config/env'
+import { DeviceTelemetry } from '../types/device'
+import { ThreatAlert } from '../types/threat'
 
-const SOC_SYSTEM_PROMPT = `You are Sentinel AI, an expert Tier-3 Cybersecurity Analyst Copilot embedded in the SentinelX Network Compromise Detection & Investigation Platform.
+/**
+ * Builds a fully dynamic SOC system prompt from the live device inventory.
+ * Every device and alert you add to the database will be included.
+ */
+function buildLiveSystemPrompt(
+  devices: DeviceTelemetry[],
+  alerts: ThreatAlert[]
+): string {
+  const compromised = devices.filter((d) => d.status === 'COMPROMISED')
+  const suspicious = devices.filter((d) => d.status === 'SUSPICIOUS')
+  const highRiskDevices = [...compromised, ...suspicious].slice(0, 10)
+
+  const activeAlerts = alerts.filter(
+    (a) => a.status === 'NEW' || a.status === 'INVESTIGATING'
+  )
+
+  const deviceSummaryLines = highRiskDevices.length > 0
+    ? highRiskDevices.map((d) =>
+        `  - ${d.id} (${d.hostname}, IP: ${d.ip}, Dept: ${d.department}, Status: ${d.status}, Risk: ${d.riskScore}%, CompromiseProb: ${d.compromiseProbability}%)`
+      ).join('\n')
+    : '  - No high-risk devices currently in inventory.'
+
+  const allDeviceLines = devices.slice(0, 20).map((d) =>
+    `  - ${d.id} | ${d.hostname} | ${d.ip} | ${d.type} | ${d.status} | Risk ${d.riskScore}%`
+  ).join('\n')
+
+  const alertLines = activeAlerts.slice(0, 10).map((a) =>
+    `  - ${a.alertCode}: ${a.title} — Device: ${a.deviceId} (${a.deviceIp}), Severity: ${a.severity}, Confidence: ${a.confidenceScore}%`
+  ).join('\n')
+
+  const topThreat = highRiskDevices[0]
+
+  return `You are Sentinel AI, an expert Tier-3 Cybersecurity Analyst Copilot embedded in the SentinelX Network Compromise Detection & Investigation Platform.
 
 Your primary mission is to assist SOC teams, incident responders, and security analysts in:
 1. Investigating suspicious network behavior and anomalous endpoint telemetry.
@@ -10,36 +44,70 @@ Your primary mission is to assist SOC teams, incident responders, and security a
 4. Mapping adversary tactics and techniques to the MITRE ATT&CK Matrix.
 5. Recommending and guiding tactical containment actions (802.1X host quarantine, firewall drop rules, credential revocation).
 
-ACTIVE SOC INVESTIGATION CONTEXT:
-- Patient Zero Host: DEVICE-042 (FIN-WS-042.internal.corp, IP: 10.0.4.42, Corporate Finance)
-- Risk Score: 94% | Compromise Probability: 94% | Bayesian AI Confidence: 96.4%
-- Core Anomaly Vectors:
-  1. DNS DGA Tunneling: 342 queries/min to algorithmically generated domains with Shannon entropy of 4.88 (baseline: 1.90).
-  2. C2 Beacon Cadence: Strict 30.02-second periodic outbound TLS pulse to external IP 185.220.101.5:443 (0.4% jitter, Cobalt Strike/Sliver profile).
-  3. Data Exfiltration Surge: 4.8 GB compressed payload transferred outbound during off-hours.
-  4. Authentication Anomaly: Off-hours Kerberos ticket request at 02:14 UTC outside normal 08:30-17:00 shift hours.
-  5. Lateral Movement Staging: Unauthorized Pass-the-Hash SMB/RPC probe to production database host SERVER-07 (DB-CORE-07, 10.0.2.7).
-- Adjacent Probed Endpoints: DEVICE-118 (10.0.4.118, Engineering DevOps Laptop).
+═══ LIVE INVENTORY SNAPSHOT ═══
+Total Monitored Endpoints: ${devices.length}
+Compromised Devices: ${compromised.length}
+Suspicious Devices: ${suspicious.length}
+Active Unresolved Alerts: ${activeAlerts.length}
+
+HIGH-RISK DEVICES REQUIRING ATTENTION:
+${deviceSummaryLines}
+
+FULL ENDPOINT INVENTORY (top 20):
+${allDeviceLines || '  - No devices in inventory yet.'}
+
+ACTIVE UNRESOLVED ALERTS:
+${alertLines || '  - No active alerts.'}
+
+${topThreat ? `PRIMARY INCIDENT FOCUS:
+- Patient Zero: ${topThreat.id} (${topThreat.hostname}, IP: ${topThreat.ip})
+- Department: ${topThreat.department}
+- Risk Score: ${topThreat.riskScore}% | Status: ${topThreat.status}
+- Compromise Probability: ${topThreat.compromiseProbability}%` : 'No critical incidents at this time.'}
 
 STYLE & FORMATTING GUIDELINES:
 - Be concise, authoritative, structured, and technical.
 - Use GitHub markdown with bold headers, bullet points, and code blocks for IoCs and query snippets.
 - Tag MITRE ATT&CK techniques in brackets (e.g. [T1071.001], [T1021.002], [T1048]).
+- Always reference the ACTUAL device IDs from the live inventory above — do NOT reference devices that are not in the list.
 - Always provide clear, actionable tactical next steps for the analyst.`
+}
+
+/** Returns the highest-priority device from the live inventory, or undefined. */
+function getTopThreat(
+  compromised: DeviceTelemetry[],
+  suspicious: DeviceTelemetry[],
+  all: DeviceTelemetry[]
+): DeviceTelemetry | undefined {
+  return compromised[0] ?? suspicious[0] ?? all[0]
+}
 
 export async function sendChatMessage(
-  payload: AIChatRequestPayload
+  payload: AIChatRequestPayload & {
+    devices?: DeviceTelemetry[]
+    alerts?: ThreatAlert[]
+  }
 ): Promise<AIChatResponsePayload> {
   const userQuery = payload.message
   const contextId = payload.context?.id || ''
   const contextName = payload.context?.name || ''
   const contextType = payload.context?.type || 'global'
+  const devices: DeviceTelemetry[] = payload.devices ?? []
+  const alerts: ThreatAlert[] = payload.alerts ?? []
+
+  const systemPrompt = buildLiveSystemPrompt(devices, alerts)
+
+  const compromised = devices.filter((d) => d.status === 'COMPROMISED') as DeviceTelemetry[]
+  const suspicious = devices.filter((d) => d.status === 'SUSPICIOUS') as DeviceTelemetry[]
+  // Use a helper to avoid TypeScript narrowing issues with `??` chains on filtered arrays
+  const topThreat = getTopThreat(compromised, suspicious, devices)
+  const activeAlerts = alerts.filter((a) => a.status === 'NEW' || a.status === 'INVESTIGATING') as ThreatAlert[]
 
   // If OpenRouter is configured, call the live LLM
   if (env.isOpenRouterConfigured) {
     try {
       const messages = [
-        { role: 'system', content: SOC_SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: `[Current UI Context: Type=${contextType}, Target=${contextId || 'Global'}, Name=${contextName}]\n\nUser Question:\n${userQuery}`,
@@ -67,26 +135,17 @@ export async function sendChatMessage(
         const aiMessage = data.choices?.[0]?.message?.content
 
         if (aiMessage) {
+          const quickActions = buildQuickActions(topThreat, activeAlerts)
           return {
             message: aiMessage,
             confidence: 0.96,
-            structuredInsight: contextId === 'DEVICE-042' || userQuery.includes('042') ? {
-              title: 'Live LLM Forensic Assessment (DEVICE-042)',
-              riskScore: 94,
-              evidence: [
-                'High-entropy DNS DGA queries (4.88 Shannon entropy)',
-                'Periodic C2 beaconing (30.02s interval / 0.4% jitter)',
-                'Volumetric outbound data exfiltration (4.8 GB)',
-                'Pass-the-hash SMB probe to DB-CORE-07',
-              ],
-              recommendedMitigation: 'Execute immediate 802.1X host isolation and sinkhole *.tunnel-c2.biz domains.',
+            structuredInsight: topThreat ? {
+              title: `Live LLM Forensic Assessment (${topThreat.id})`,
+              riskScore: topThreat.riskScore,
+              evidence: buildEvidenceList(topThreat, activeAlerts),
+              recommendedMitigation: `Execute immediate 802.1X host isolation on ${topThreat.id} and audit adjacent network flows.`,
             } : undefined,
-            actions: [
-              { id: 'act-isolate-042', label: 'Isolate DEVICE-042', actionType: 'isolate_device', payload: { deviceId: 'DEVICE-042' } },
-              { id: 'act-trace-graph', label: 'Trace Attack Path', actionType: 'navigate', payload: { path: '/attack-graph' } },
-              { id: 'act-view-timeline', label: 'View Attack Timeline', actionType: 'navigate', payload: { path: '/timeline' } },
-              { id: 'act-gen-report', label: 'Generate Incident Report', actionType: 'generate_report', payload: { deviceId: 'DEVICE-042' } },
-            ],
+            actions: quickActions,
           }
         }
       }
@@ -96,54 +155,123 @@ export async function sendChatMessage(
     }
   }
 
-  // Fallback to embedded local cybersecurity knowledge base
+  // ── Local fallback: device-aware knowledge responses ──────────────────────
   await new Promise((resolve) => setTimeout(resolve, 300))
 
   const queryLower = userQuery.toLowerCase()
+  const quickActions = buildQuickActions(topThreat, activeAlerts)
 
-  if (contextId === 'DEVICE-042' || queryLower.includes('042') || queryLower.includes('patient zero') || queryLower.includes('finance')) {
+  // Match against any device in the live inventory
+  const mentionedDevice = devices.find(
+    (d) =>
+      queryLower.includes(d.id.toLowerCase()) ||
+      queryLower.includes(d.hostname.toLowerCase()) ||
+      queryLower.includes(d.ip)
+  )
+
+  const targetDevice = mentionedDevice || (contextId ? devices.find((d) => d.id === contextId) : null) || topThreat
+
+  if (targetDevice) {
+    const deviceAlerts = alerts.filter((a) => a.deviceId === targetDevice.id)
+    const alertSummary = deviceAlerts.length > 0
+      ? deviceAlerts.slice(0, 3).map((a) => `  - ${a.alertCode}: ${a.title} (${a.severity})`).join('\n')
+      : '  - No database alerts recorded for this device.'
+
     return {
-      message: `**Tactical AI Assessment for DEVICE-042 (FIN-WS-042):**\n\n- **Compromise Probability:** 94% (Critical Threat)\n- **Primary Attack Vector:** Command & Control [T1071.001] + High-Entropy DNS DGA Tunneling [T1071.004]\n- **Observed Telemetry Deviations:**\n  - **DNS Behavior (+31% contribution):** 342 queries/min to algorithmically generated domains with average Shannon entropy of 4.88.\n  - **Beaconing Pattern (+14%):** Strict 30.02s periodic outbound check-in to external IP \`185.220.101.5\` (0.4% jitter).\n  - **Data Exfiltration (+24%):** 4.8 GB outbound encrypted stream over port 443 [T1048].\n  - **Lateral Movement (+7%):** SMB connection attempt to production database server \`DB-CORE-07\` [T1021.002].\n\n**Probabilistic Reasoning:** The observed multi-vector anomaly profile deviates by 6.8 standard deviations from the 30-day baseline for the Finance Department workstation cluster. Bayesian confidence is calibrated at 96.4%.`,
-      confidence: 0.94,
+      message: `**Tactical AI Assessment for ${targetDevice.id} (${targetDevice.hostname}):**\n\n- **Status:** ${targetDevice.status}\n- **Risk Score:** ${targetDevice.riskScore}%\n- **Compromise Probability:** ${targetDevice.compromiseProbability}%\n- **Department:** ${targetDevice.department}\n- **IP Address:** \`${targetDevice.ip}\`\n\n**Active Alerts for This Device:**\n${alertSummary}\n\n**Recommended Actions:**\n1. Isolate ${targetDevice.id} via 802.1X if status is COMPROMISED or SUSPICIOUS.\n2. Capture volatile memory image before rebooting.\n3. Review DNS, authentication, and lateral movement logs.\n4. Revoke active Kerberos tickets if credential theft is suspected.\n\nWould you like me to generate a containment playbook or incident report for ${targetDevice.id}?`,
+      confidence: targetDevice.status === 'COMPROMISED' ? 0.94 : 0.87,
       structuredInsight: {
-        title: 'High-Probability Active Host Compromise (DEVICE-042)',
-        riskScore: 94,
-        evidence: [
-          'Abnormal DNS Entropy (4.88 vs 1.90 baseline)',
-          'C2 Beaconing (30.02s interval / 0.4% jitter)',
-          'Outbound Traffic Surge (4.8 GB exfil)',
-          'Lateral SMB Hop to DB-CORE-07',
-        ],
-        recommendedMitigation: 'Execute immediate 802.1X host isolation and sinkhole *.tunnel-c2.biz DNS domains.',
+        title: `${targetDevice.status === 'COMPROMISED' ? 'High-Probability Active Compromise' : 'Suspicious Activity Detected'} (${targetDevice.id})`,
+        riskScore: targetDevice.riskScore,
+        evidence: buildEvidenceList(targetDevice, deviceAlerts),
+        recommendedMitigation: `Execute 802.1X host isolation on ${targetDevice.id} and audit all lateral connections.`,
       },
       actions: [
-        { id: 'act-isolate-042', label: 'Isolate DEVICE-042', actionType: 'isolate_device', payload: { deviceId: 'DEVICE-042' } },
+        { id: `act-isolate-${targetDevice.id}`, label: `Isolate ${targetDevice.id}`, actionType: 'isolate_device', payload: { deviceId: targetDevice.id } },
         { id: 'act-trace-graph', label: 'Trace Attack Path', actionType: 'navigate', payload: { path: '/attack-graph' } },
-        { id: 'act-view-timeline', label: 'View Attack Timeline', actionType: 'navigate', payload: { path: '/timeline' } },
-        { id: 'act-gen-report', label: 'Generate Incident Summary', actionType: 'generate_report', payload: { deviceId: 'DEVICE-042' } },
+        { id: 'act-gen-report', label: 'Generate Incident Report', actionType: 'generate_report', payload: { deviceId: targetDevice.id } },
+        { id: 'act-view-threats', label: 'Review All Alerts', actionType: 'navigate', payload: { path: '/threats' } },
       ],
     }
   }
 
   if (queryLower.includes('beacon') || queryLower.includes('cadence') || queryLower.includes('jitter') || queryLower.includes('c2')) {
+    let c2Message: string
+    if (topThreat !== undefined) {
+      const dt: DeviceTelemetry = topThreat as DeviceTelemetry
+      const id = dt.id
+      const ip = dt.ip
+      const devStatus = dt.status
+      const risk = dt.riskScore
+      c2Message = `**C2 Periodic Beaconing Analysis:**\n\n- **Target Host:** ${id} (${ip})\n- **Status:** ${devStatus} | Risk: ${risk}%\n- **Signal Processing Attribution:** Fast Fourier Transform (FFT) can detect synchronized periodic pulses in outbound traffic.\n- **MITRE Technique:** [T1071.001 Web Protocols] & [T1573 Encrypted Channel]\n\n**Recommended Response:**\n1. Enforce 802.1X quarantine on ${id}.\n2. Push perimeter firewall rule to drop outbound traffic on all unauthorized external ports.\n3. Dump volatile memory for process injection analysis.\n\nWould you like me to generate specific firewall drop rules?`
+    } else {
+      c2Message = `**C2 Beaconing Analysis:**\n\nNo compromised devices currently in inventory. Add devices and I'll analyze beaconing patterns against them.`
+    }
     return {
-      message: `**C2 Periodic Beaconing Analysis:**\n\n- **Target Host:** DEVICE-042 (10.0.4.42)\n- **Adversary Infrastructure:** 185.220.101.5:443 (NL / Bulletproof ASN 49302)\n- **Signal Processing Attribution:** Fast Fourier Transform (FFT) detected synchronized periodic pulses at exactly **30.02-second** intervals with **0.4% jitter variance**.\n- **MITRE Technique:** [T1071.001 Web Protocols] & [T1573 Encrypted Channel]\n\n**Recommended Response:**\n1. Enforce 802.1X quarantine on DEVICE-042.\n2. Push perimeter firewall rule to drop all traffic to CIDR \`185.220.101.0/24\`.\n3. Dump volatile memory for process injection analysis (\`svchost.exe\` / \`lsass.exe\`).`,
+      message: c2Message,
       confidence: 0.96,
-      actions: [
-        { id: 'act-isolate-042', label: 'Isolate DEVICE-042', actionType: 'isolate_device', payload: { deviceId: 'DEVICE-042' } },
-        { id: 'act-trace-graph', label: 'Inspect Blast Radius', actionType: 'navigate', payload: { path: '/attack-graph' } },
-      ],
+      actions: quickActions,
     }
   }
 
+  // General summary fallback
+  const summaryLines = [
+    devices.length > 0
+      ? `I'm currently monitoring **${devices.length} endpoint${devices.length !== 1 ? 's' : ''}** in your live inventory.`
+      : `No devices are currently in your inventory. Add devices on the Devices page to begin monitoring.`,
+    compromised.length > 0
+      ? `⚠️ **${compromised.length} device${compromised.length !== 1 ? 's' : ''}** ${compromised.length !== 1 ? 'are' : 'is'} in COMPROMISED state: ${compromised.slice(0, 3).map((d) => d.id).join(', ')}.`
+      : null,
+    suspicious.length > 0
+      ? `🔍 **${suspicious.length} device${suspicious.length !== 1 ? 's' : ''}** ${suspicious.length !== 1 ? 'are' : 'is'} flagged as SUSPICIOUS: ${suspicious.slice(0, 3).map((d) => d.id).join(', ')}.`
+      : null,
+    activeAlerts.length > 0
+      ? `🚨 **${activeAlerts.length} active alert${activeAlerts.length !== 1 ? 's' : ''}** require triage.`
+      : `✅ No active security alerts at this time.`,
+  ].filter(Boolean).join('\n\n')
+
   return {
-    message: `**Sentinel AI Intelligence Summary:**\n\nI have analyzed your query against our live behavioral telemetry store. Across our monitored corporate network, the primary active incident centers on **DEVICE-042** (FIN-WS-042) exhibiting a multi-stage compromise involving DNS tunneling, C2 beaconing, and lateral movement toward **SERVER-07**.\n\nHow would you like to proceed with the investigation?`,
+    message: `**Sentinel AI Intelligence Summary:**\n\n${summaryLines}\n\nHow would you like to proceed with the investigation?`,
     confidence: 0.95,
-    actions: [
-      { id: 'act-investigate-042', label: 'Investigate DEVICE-042', actionType: 'navigate', payload: { path: '/devices/DEVICE-042' } },
-      { id: 'act-view-threats', label: 'Review All Alerts', actionType: 'navigate', payload: { path: '/threats' } },
-      { id: 'act-attack-graph', label: 'Open Attack Graph', actionType: 'navigate', payload: { path: '/attack-graph' } },
-      { id: 'act-reports', label: 'Export Incident Report', actionType: 'navigate', payload: { path: '/reports' } },
-    ],
+    actions: quickActions,
   }
+}
+
+function buildQuickActions(
+  topThreat: DeviceTelemetry | undefined,
+  activeAlerts: ThreatAlert[]
+) {
+  const actions = []
+  if (topThreat) {
+    actions.push({
+      id: `act-investigate-${topThreat.id}`,
+      label: `Investigate ${topThreat.id}`,
+      actionType: 'navigate' as const,
+      payload: { path: `/devices/${topThreat.id}` },
+    })
+    actions.push({
+      id: `act-isolate-${topThreat.id}`,
+      label: `Isolate ${topThreat.id}`,
+      actionType: 'isolate_device' as const,
+      payload: { deviceId: topThreat.id },
+    })
+  }
+  actions.push({ id: 'act-view-threats', label: 'Review All Alerts', actionType: 'navigate' as const, payload: { path: '/threats' } })
+  actions.push({ id: 'act-attack-graph', label: 'Open Attack Graph', actionType: 'navigate' as const, payload: { path: '/attack-graph' } })
+  if (activeAlerts.length > 0) {
+    actions.push({ id: 'act-reports', label: 'Export Incident Report', actionType: 'navigate' as const, payload: { path: '/reports' } })
+  }
+  return actions
+}
+
+function buildEvidenceList(device: DeviceTelemetry, alerts: ThreatAlert[]): string[] {
+  const evidence: string[] = []
+  if (device.status === 'COMPROMISED') evidence.push(`Device status: COMPROMISED (Risk: ${device.riskScore}%)`)
+  if (device.status === 'SUSPICIOUS') evidence.push(`Device status: SUSPICIOUS (Risk: ${device.riskScore}%)`)
+  if (device.compromiseProbability >= 80) evidence.push(`High compromise probability: ${device.compromiseProbability}%`)
+  alerts.slice(0, 4).forEach((a) => {
+    evidence.push(`${a.alertCode}: ${a.title} (${a.severity})`)
+  })
+  if (evidence.length === 0) evidence.push(`Monitoring ${device.id} — no high-severity flags currently.`)
+  return evidence
 }

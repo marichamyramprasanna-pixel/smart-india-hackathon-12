@@ -26,7 +26,8 @@ import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { useSentinelAI } from '../context/SentinelAIContext'
 import { useInvestigation } from '../context/InvestigationContext'
-import { useDemoScenario } from '../context/DemoScenarioContext'
+import { useDevices } from '../hooks/useDevices'
+import { useAlerts } from '../hooks/useAlerts'
 
 export const AIChatPage: React.FC = () => {
   const navigate = useNavigate()
@@ -39,13 +40,18 @@ export const AIChatPage: React.FC = () => {
     clearChat,
   } = useSentinelAI()
 
-  const { isolateDevice, unisolateDevice, isDeviceIsolated, blockIp, isIpBlocked } = useInvestigation()
-  const { currentStage } = useDemoScenario()
+  const { isolateDevice, unisolateDevice, isDeviceIsolated } = useInvestigation()
+  const { devices } = useDevices()
+  const { alerts } = useAlerts()
+
+  // Dynamically detect highest-risk device from live inventory
+  const compromised = devices.filter((d) => d.status === 'COMPROMISED')
+  const suspicious = devices.filter((d) => d.status === 'SUSPICIOUS')
+  const topDevice = compromised[0] || suspicious[0] || devices[0]
+  const isTopDeviceIsolated = topDevice ? isDeviceIsolated(topDevice.id) : false
 
   const [inputVal, setInputVal] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const isDev42Isolated = isDeviceIsolated('DEVICE-042')
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -58,40 +64,51 @@ export const AIChatPage: React.FC = () => {
     setInputVal('')
   }
 
+  // Build playbooks dynamically around live device inventory
   const promptPlaybooks = [
     {
-      title: 'Triage Patient Zero (DEVICE-042)',
-      prompt: 'Perform an exhaustive behavioral triage on DEVICE-042 (FIN-WS-042) and list all detected anomaly vectors.',
+      title: topDevice ? `Triage ${topDevice.id}` : 'Triage Highest-Risk Device',
+      prompt: topDevice
+        ? `Perform an exhaustive behavioral triage on ${topDevice.id} (${topDevice.hostname}, IP: ${topDevice.ip}) and list all detected anomaly vectors.`
+        : 'What devices are currently monitored and which require immediate attention?',
       icon: <Laptop className="h-3.5 w-3.5 text-cyan-400" />,
-      tag: 'CRITICAL',
+      tag: topDevice?.status === 'COMPROMISED' ? 'CRITICAL' : 'TRIAGE',
     },
     {
-      title: 'Explain DNS DGA Tunneling',
-      prompt: 'Why did SentinelX flag DNS DGA anomaly on DEVICE-042? Explain the Shannon entropy calculation (4.88) and dynamic domain resolution.',
+      title: 'Explain AI Behavioral Detection',
+      prompt: topDevice
+        ? `Why did SentinelX flag ${topDevice.id} as ${topDevice.status}? Explain the behavioral model's reasoning.`
+        : 'How does SentinelX AI behavioral detection model work?',
       icon: <Radio className="h-3.5 w-3.5 text-purple-400" />,
       tag: 'EXPLAINABILITY',
     },
     {
       title: 'Analyze C2 Beaconing Cadence',
-      prompt: 'Analyze the 30.02-second periodic beacon pulse detected on port 443 to external IP 185.220.101.5 and evaluate jitter variance.',
+      prompt: topDevice
+        ? `Analyze potential C2 beaconing patterns from ${topDevice.id} and evaluate jitter variance.`
+        : 'How do I detect C2 beaconing patterns in network telemetry?',
       icon: <Flame className="h-3.5 w-3.5 text-red-400" />,
       tag: 'C2 DETECTION',
     },
     {
-      title: 'Trace Lateral Hop to DB-CORE-07',
-      prompt: 'Trace the unauthorized Pass-the-Hash SMB connection from DEVICE-042 to SERVER-07 (DB-CORE-07) and assess database exposure risk.',
+      title: 'Trace Lateral Movement',
+      prompt: compromised.length > 0
+        ? `Trace potential lateral movement paths from ${compromised[0].id} to other network segments and assess blast radius.`
+        : 'How do I detect lateral movement across network segments?',
       icon: <Server className="h-3.5 w-3.5 text-orange-400" />,
       tag: 'LATERAL MOVEMENT',
     },
     {
       title: 'Generate SOC Incident Brief',
-      prompt: 'Generate an executive incident summary for the active coordinated compromise including technical IoCs and MITRE tactics.',
+      prompt: `Generate an executive incident summary for the current network state with ${compromised.length} compromised and ${suspicious.length} suspicious devices, including MITRE ATT&CK tactics.`,
       icon: <FileText className="h-3.5 w-3.5 text-emerald-400" />,
       tag: 'EXECUTIVE REPORT',
     },
     {
       title: 'Enforce Containment Playbook',
-      prompt: 'What are the required containment actions to quarantine the threat and prevent further lateral expansion?',
+      prompt: topDevice
+        ? `What are the required containment actions to isolate ${topDevice.id} and prevent further lateral expansion?`
+        : 'What containment actions should I take for an active network compromise?',
       icon: <Lock className="h-3.5 w-3.5 text-amber-400" />,
       tag: 'REMEDIATION',
     },
@@ -181,15 +198,17 @@ export const AIChatPage: React.FC = () => {
             <span>Clear Session</span>
           </Button>
 
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => navigate('/devices/DEVICE-042')}
-            className="text-xs font-semibold gap-1.5"
-          >
-            <span>Target Host: DEVICE-042</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
+          {topDevice && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(`/devices/${topDevice.id}`)}
+              className="text-xs font-semibold gap-1.5"
+            >
+              <span>Target Host: {topDevice.id}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -248,12 +267,12 @@ export const AIChatPage: React.FC = () => {
               <span className="text-slate-500 font-mono text-[11px]">ACTIVE CONTEXT:</span>
               <span className="font-mono font-bold text-cyan-300 flex items-center gap-1.5 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded">
                 <Laptop className="h-3.5 w-3.5 text-cyan-400" />
-                {currentContext.id || 'DEVICE-042'} (FIN-WS-042)
+                {currentContext.id || topDevice?.id || 'No Device Selected'}
               </span>
             </div>
 
             <span className="text-[11px] font-mono text-slate-400">
-              Posterior Risk: <strong className="text-red-400">{currentStage.compromiseProbability}%</strong>
+              Risk: <strong className={topDevice && topDevice.riskScore >= 80 ? 'text-red-400' : topDevice && topDevice.riskScore >= 50 ? 'text-orange-400' : 'text-cyan-400'}>{topDevice?.riskScore ?? 0}%</strong>
             </span>
           </div>
 
@@ -399,43 +418,47 @@ export const AIChatPage: React.FC = () => {
               <span className="text-[10px] font-mono font-bold uppercase text-slate-400">
                 TARGET TELEMETRY STATE
               </span>
-              <Badge variant={currentStage.compromiseProbability >= 80 ? 'critical' : 'high'} className="text-[9px]">
-                {currentStage.compromiseProbability}% RISK
+              <Badge variant={topDevice && topDevice.riskScore >= 80 ? 'critical' : 'high'} className="text-[9px]">
+                {topDevice?.riskScore ?? 0}% RISK
               </Badge>
             </div>
 
             <div className="space-y-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Host ID:</span>
-                <span className="font-mono font-bold text-slate-100">DEVICE-042</span>
+                <span className="font-mono font-bold text-slate-100">{topDevice?.id ?? '—'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Hostname:</span>
-                <span className="font-mono text-slate-300">FIN-WS-042</span>
+                <span className="font-mono text-slate-300">{topDevice?.hostname ?? '—'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">IP Socket:</span>
-                <span className="font-mono text-cyan-300">10.0.4.42</span>
+                <span className="font-mono text-cyan-300">{topDevice?.ip ?? '—'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Department:</span>
-                <span className="text-slate-300">Finance</span>
+                <span className="text-slate-300">{topDevice?.department ?? '—'}</span>
               </div>
             </div>
 
             <div className="pt-2 border-t border-slate-800">
-              <Button
-                variant={isDev42Isolated ? 'secondary' : 'destructive'}
-                size="sm"
-                onClick={() => {
-                  if (isDev42Isolated) unisolateDevice('DEVICE-042')
-                  else isolateDevice('DEVICE-042', 'FIN-WS-042')
-                }}
-                className="w-full text-xs gap-1.5 shadow-red-glow-sm"
-              >
-                {isDev42Isolated ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                <span>{isDev42Isolated ? 'Release Quarantine' : 'Quarantine DEVICE-042'}</span>
-              </Button>
+              {topDevice ? (
+                <Button
+                  variant={isTopDeviceIsolated ? 'secondary' : 'destructive'}
+                  size="sm"
+                  onClick={() => {
+                    if (isTopDeviceIsolated) unisolateDevice(topDevice.id)
+                    else isolateDevice(topDevice.id, topDevice.hostname)
+                  }}
+                  className="w-full text-xs gap-1.5 shadow-red-glow-sm"
+                >
+                  {isTopDeviceIsolated ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                  <span>{isTopDeviceIsolated ? 'Release Quarantine' : `Quarantine ${topDevice.id}`}</span>
+                </Button>
+              ) : (
+                <p className="text-xs text-slate-500 text-center">No devices in inventory</p>
+              )}
             </div>
           </Card>
 
@@ -448,27 +471,16 @@ export const AIChatPage: React.FC = () => {
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="p-2 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] font-mono text-cyan-400 uppercase block">C2 SERVER</span>
-                  <p className="font-mono text-slate-200 text-[11px]">185.220.101.5</p>
+              {alerts.slice(0, 2).flatMap((a) => a.indicators?.slice(0, 1) || []).map((ind, i) => (
+                <div key={i} className="p-2 rounded bg-slate-950 border border-slate-800">
+                  <span className="text-[9px] font-mono text-cyan-400 uppercase block">{ind.type}</span>
+                  <p className="font-mono text-slate-200 text-[11px]">{ind.value}</p>
+                  <span className="text-[10px] text-slate-500 font-mono">{ind.reputation}</span>
                 </div>
-                <Button
-                  variant={isIpBlocked('185.220.101.5') ? 'secondary' : 'destructive'}
-                  size="sm"
-                  onClick={() => blockIp('185.220.101.5')}
-                  disabled={isIpBlocked('185.220.101.5')}
-                  className="h-6 px-2 text-[10px]"
-                >
-                  {isIpBlocked('185.220.101.5') ? 'Blocked' : 'Block IP'}
-                </Button>
-              </div>
-
-              <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                <span className="text-[9px] font-mono text-purple-400 uppercase block">DGA DOMAIN</span>
-                <p className="font-mono text-slate-200 text-[11px]">x9q7f-tunnel-c2.biz</p>
-                <span className="text-[10px] text-slate-500 font-mono">Shannon Entropy: 4.88</span>
-              </div>
+              ))}
+              {alerts.flatMap((a) => a.indicators || []).length === 0 && (
+                <p className="text-xs text-slate-500 py-2 text-center">No active IoCs</p>
+              )}
             </div>
 
             <div className="pt-2 border-t border-slate-800">

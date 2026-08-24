@@ -88,13 +88,13 @@ export const alertService = {
       if (error) throw error
 
       if (!data || data.length === 0) {
-        return { data: demoThreats, error: null }
+        return { data: [], error: null }
       }
 
       return { data: (data as Tables<'threat_alerts'>[]).map(mapRowToAlert), error: null }
     } catch (err) {
       const appErr = handleSupabaseError(err)
-      return { data: demoThreats, error: null }
+      return { data: [], error: appErr.message }
     }
   },
 

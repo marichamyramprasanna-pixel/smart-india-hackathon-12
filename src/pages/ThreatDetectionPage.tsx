@@ -27,13 +27,8 @@ export const ThreatDetectionPage: React.FC = () => {
   // Subscribe to Supabase Realtime changes
   useRealtimeAlerts()
 
-  // Blend in active stage alerts
-  const activeAlerts = useMemo(() => {
-    return alerts.filter((t) => currentStage.activeAlertIds.includes(t.id) || currentStage.activeAlertIds.length === 0 || alerts.length <= 3)
-  }, [alerts, currentStage.activeAlertIds])
-
   const filteredThreats = useMemo(() => {
-    return activeAlerts.filter((t) => {
+    return alerts.filter((t) => {
       const matchesQuery =
         t.alertCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -45,7 +40,7 @@ export const ThreatDetectionPage: React.FC = () => {
       if (selectedStatus !== 'ALL' && t.status !== selectedStatus) return false
       return true
     })
-  }, [activeAlerts, searchQuery, selectedSeverity, selectedStatus])
+  }, [alerts, searchQuery, selectedSeverity, selectedStatus])
 
   return (
     <div className="space-y-6">
@@ -80,11 +75,11 @@ export const ThreatDetectionPage: React.FC = () => {
           </Button>
 
           <Badge
-            variant={activeAlerts.length > 0 ? 'critical' : 'healthy'}
-            pulse={activeAlerts.length > 0}
+            variant={alerts.length > 0 ? 'critical' : 'healthy'}
+            pulse={alerts.length > 0}
             className="font-mono text-xs"
           >
-            {activeAlerts.length} ACTIVE ALERTS
+            {alerts.length} ACTIVE ALERTS
           </Badge>
         </div>
       </div>

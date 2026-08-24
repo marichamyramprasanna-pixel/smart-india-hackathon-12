@@ -16,7 +16,9 @@ export function useAlerts(filters?: {
       const res = await alertService.getAlerts(filters)
       return res.data
     },
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 30,        // treat data fresh for 30s
+    refetchInterval: 1000 * 30,  // auto-refresh every 30s in background
+    refetchIntervalInBackground: false,
   })
 
   const updateStatusMutation = useMutation({

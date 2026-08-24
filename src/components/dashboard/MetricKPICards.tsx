@@ -23,10 +23,14 @@ export const MetricKPICards: React.FC = () => {
   const activeDeviceCount = devices.length
   const suspiciousCount = devices.filter(
     (d) => d.status === 'SUSPICIOUS' || d.status === 'COMPROMISED'
-  ).length || currentStage.suspiciousDevicesCount
+  ).length
   const activeAlertCount = alerts.filter(
     (a) => a.status === 'NEW' || a.status === 'INVESTIGATING'
-  ).length || currentStage.activeThreatsCount
+  ).length
+
+  const maxCompromise = devices.length > 0 ? Math.max(...devices.map((d) => d.compromiseProbability || 0)) : 0
+  const calculatedHealth = Math.max(10, Math.round(100 - (suspiciousCount / Math.max(devices.length, 1)) * 40 - (maxCompromise * 0.3)))
+  const calculatedConfidence = devices.length > 0 ? Math.min(99, Math.max(88, Math.round(96 - (maxCompromise * 0.05)))) : 98
 
   const metrics = [
     {
@@ -62,9 +66,9 @@ export const MetricKPICards: React.FC = () => {
     {
       id: 'kpi-network-health',
       label: 'Network Baseline Health',
-      value: `${currentStage.networkHealth}%`,
-      trend: currentStage.networkHealth >= 90 ? 'Nominal' : 'Degraded',
-      isPositiveTrend: currentStage.networkHealth >= 90,
+      value: `${calculatedHealth}%`,
+      trend: calculatedHealth >= 80 ? 'Nominal' : 'Degraded',
+      isPositiveTrend: calculatedHealth >= 80,
       icon: <Activity className="h-4 w-4 text-emerald-400" />,
       tooltip: 'Composite telemetry stability index across DNS, NetFlow, and authentication integrity.',
       accent: 'border-emerald-500/20 text-emerald-400',
@@ -72,7 +76,7 @@ export const MetricKPICards: React.FC = () => {
     {
       id: 'kpi-ai-confidence',
       label: 'AI Detection Confidence',
-      value: `${Math.round(100 - (currentStage.compromiseProbability * 0.05))}%`,
+      value: `${calculatedConfidence}%`,
       trend: 'Calibrated',
       isPositiveTrend: true,
       icon: <BrainCircuit className="h-4 w-4 text-purple-400" />,

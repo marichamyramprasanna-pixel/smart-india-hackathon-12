@@ -40,31 +40,9 @@ export const DevicesPage: React.FC = () => {
     deviceType: typeFilter !== 'ALL' ? typeFilter : undefined,
   })
 
-  // Integrate live Demo Scenario state into devices
-  const reactiveDevices = useMemo(() => {
-    return devices.map((d) => {
-      if (d.id === 'DEVICE-042') {
-        return {
-          ...d,
-          status: currentStage.device42Status,
-          riskScore: currentStage.device42Risk,
-          compromiseProbability: currentStage.compromiseProbability,
-        }
-      }
-      if (d.id === 'SERVER-07') {
-        return {
-          ...d,
-          status: currentStage.server07Status,
-          riskScore: currentStage.server07Risk,
-        }
-      }
-      return d
-    })
-  }, [devices, currentStage])
-
   // Filter devices
   const filteredDevices = useMemo(() => {
-    return reactiveDevices.filter((dev) => {
+    return devices.filter((dev) => {
       const matchesSearch =
         dev.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         dev.hostname.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -75,7 +53,7 @@ export const DevicesPage: React.FC = () => {
       if (typeFilter !== 'ALL' && dev.type.toUpperCase() !== typeFilter) return false
       return true
     })
-  }, [reactiveDevices, searchQuery, typeFilter])
+  }, [devices, searchQuery, typeFilter])
 
   const {
     register,

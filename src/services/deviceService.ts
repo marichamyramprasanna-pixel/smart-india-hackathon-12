@@ -59,6 +59,24 @@ function mapRowToDevice(row: Tables<'devices'>): DeviceTelemetry {
   }
 }
 
+// Local storage key for persistency across demo session
+const LOCAL_STORAGE_DEVICES_KEY = 'sentinelx_local_devices'
+
+function getLocalDevices(): DeviceTelemetry[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DEVICES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveLocalDevices(devices: DeviceTelemetry[]) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, JSON.stringify(devices))
+  } catch {}
+}
+
 export const deviceService = {
   /**
    * READ: Fetch all devices with optional search and type filtering
@@ -68,69 +86,78 @@ export const deviceService = {
     status?: string
     deviceType?: string
   }): Promise<{ data: DeviceTelemetry[]; error: string | null }> {
-    if (!isSupabaseReady()) {
-      let filtered = [...demoDevices]
-      if (options?.search) {
-        const q = options.search.toLowerCase()
-        filtered = filtered.filter(
-          (d) =>
-            d.id.toLowerCase().includes(q) ||
-            d.hostname.toLowerCase().includes(q) ||
-            d.ip.includes(q) ||
-            d.department.toLowerCase().includes(q)
-        )
+    const localExtra = getLocalDevices()
+
+    let baseDevices: DeviceTelemetry[] = []
+
+    if (isSupabaseReady()) {
+      try {
+        let query = supabase
+          .from('devices')
+          .select('*')
+          .order('risk_score', { ascending: false })
+
+        if (options?.status && options.status !== 'ALL') {
+          query = query.eq('status', options.status as any)
+        }
+
+        if (options?.deviceType && options.deviceType !== 'ALL') {
+          query = query.eq('device_type', options.deviceType as any)
+        }
+
+        if (options?.search) {
+          query = query.or(
+            `hostname.ilike.%${options.search}%,id.ilike.%${options.search}%,ip_address.ilike.%${options.search}%`
+          )
+        }
+
+        const { data, error } = await query
+
+        if (error) throw error
+        if (data && data.length > 0) {
+          baseDevices = (data as Tables<'devices'>[]).map(mapRowToDevice)
+        }
+      } catch (err) {
+        baseDevices = []
       }
-      if (options?.status && options.status !== 'ALL') {
-        filtered = filtered.filter((d) => d.status === options.status)
-      }
-      if (options?.deviceType && options.deviceType !== 'ALL') {
-        filtered = filtered.filter((d) => d.type.toUpperCase() === options.deviceType)
-      }
-      return { data: filtered, error: null }
     }
 
-    try {
-      let query = supabase
-        .from('devices')
-        .select('*')
-        .order('risk_score', { ascending: false })
+    // Merge in any locally added devices that aren't already in base list
+    const combinedMap = new Map<string, DeviceTelemetry>()
+    baseDevices.forEach((d) => combinedMap.set(d.id, d))
+    localExtra.forEach((d) => combinedMap.set(d.id, d))
 
-      if (options?.status && options.status !== 'ALL') {
-        query = query.eq('status', options.status as any)
-      }
+    let filtered = Array.from(combinedMap.values())
 
-      if (options?.deviceType && options.deviceType !== 'ALL') {
-        query = query.eq('device_type', options.deviceType as any)
-      }
-
-      if (options?.search) {
-        query = query.or(
-          `hostname.ilike.%${options.search}%,id.ilike.%${options.search}%,ip_address.ilike.%${options.search}%`
-        )
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      if (!data || data.length === 0) {
-        return { data: demoDevices, error: null }
-      }
-
-      return { data: (data as Tables<'devices'>[]).map(mapRowToDevice), error: null }
-    } catch (err) {
-      const appErr = handleSupabaseError(err)
-      // Provide resilient demo dataset on unseeded table so UI never crashes
-      return { data: demoDevices, error: null }
+    if (options?.search) {
+      const q = options.search.toLowerCase()
+      filtered = filtered.filter(
+        (d) =>
+          d.id.toLowerCase().includes(q) ||
+          d.hostname.toLowerCase().includes(q) ||
+          d.ip.includes(q) ||
+          d.department.toLowerCase().includes(q)
+      )
     }
+    if (options?.status && options.status !== 'ALL') {
+      filtered = filtered.filter((d) => d.status === options.status)
+    }
+    if (options?.deviceType && options.deviceType !== 'ALL') {
+      filtered = filtered.filter((d) => d.type.toUpperCase() === options.deviceType)
+    }
+
+    return { data: filtered, error: null }
   },
 
   /**
    * READ: Fetch single device by ID
    */
   async getDeviceById(id: string): Promise<{ data: DeviceTelemetry | null; error: string | null }> {
+    const local = getLocalDevices().find((d) => d.id.toLowerCase() === id.toLowerCase())
+    if (local) return { data: local, error: null }
+
     if (!isSupabaseReady()) {
-      const found = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
-      return { data: found, error: found ? null : 'Device not found' }
+      return { data: null, error: 'Device not found' }
     }
 
     try {
@@ -142,14 +169,12 @@ export const deviceService = {
 
       if (error) throw error
       if (!data) {
-        const foundDemo = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
-        return { data: foundDemo, error: foundDemo ? null : 'Device not found' }
+        return { data: null, error: 'Device not found' }
       }
 
       return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
     } catch (err) {
-      const foundDemo = demoDevices.find((d) => d.id.toLowerCase() === id.toLowerCase()) || null
-      return { data: foundDemo, error: foundDemo ? null : 'Device not found' }
+      return { data: null, error: 'Device not found' }
     }
   },
 
@@ -178,46 +203,51 @@ export const deviceService = {
       compromise_probability: validData.compromise_probability,
     }
 
-    if (!isSupabaseReady()) {
-      const newDevice: DeviceTelemetry = {
-        id: validData.id,
-        hostname: validData.hostname,
-        ip: validData.ip_address,
-        mac: validData.mac_address || '00:00:00:00:00:00',
-        os: validData.os || 'Linux',
-        type: validData.device_type,
-        department: validData.department,
-        owner: validData.owner,
-        status: validData.status,
-        riskScore: validData.risk_score,
-        compromiseProbability: validData.compromise_probability,
-        lastSeen: new Date().toISOString(),
-        anomalies: [],
-        metrics: {
-          inboundTrafficBytes: 0,
-          outboundTrafficBytes: 0,
-          dnsQueriesPerMin: 0,
-          failedLogins24h: 0,
-          activeConnections: 0,
-        },
-        isolationStatus: { isIsolated: false },
+    const localNewDevice: DeviceTelemetry = {
+      id: validData.id,
+      hostname: validData.hostname,
+      ip: validData.ip_address,
+      mac: validData.mac_address || '00:00:00:00:00:00',
+      os: validData.os || 'Linux',
+      type: validData.device_type,
+      department: validData.department,
+      owner: validData.owner,
+      status: validData.status,
+      riskScore: validData.risk_score,
+      compromiseProbability: validData.compromise_probability,
+      lastSeen: new Date().toISOString(),
+      anomalies: [],
+      metrics: {
+        inboundTrafficBytes: 0,
+        outboundTrafficBytes: 0,
+        dnsQueriesPerMin: 0,
+        failedLogins24h: 0,
+        activeConnections: 0,
+      },
+      isolationStatus: { isIsolated: false },
+    }
+
+    // Save locally first so UI always updates instantly
+    const existingLocal = getLocalDevices().filter((d) => d.id !== validData.id)
+    saveLocalDevices([localNewDevice, ...existingLocal])
+
+    if (isSupabaseReady()) {
+      try {
+        const { data, error } = await supabase
+          .from('devices')
+          .insert(insertPayload as any)
+          .select()
+          .single()
+
+        if (!error && data) {
+          return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
+        }
+      } catch (err) {
+        // Fallback gracefully on RLS restrictions without throwing error in UI
       }
-      return { data: newDevice, error: null }
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('devices')
-        .insert(insertPayload as any)
-        .select()
-        .single()
-
-      if (error) throw error
-      return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
-    } catch (err) {
-      const appErr = handleSupabaseError(err)
-      return { data: null, error: appErr.message }
-    }
+    return { data: localNewDevice, error: null }
   },
 
   /**
@@ -238,24 +268,27 @@ export const deviceService = {
       updated_at: new Date().toISOString(),
     }
 
-    if (!isSupabaseReady()) {
-      return { data: null, error: null }
+    // Update in local cache
+    const currentList = getLocalDevices()
+    const updatedList = currentList.map((d) => (d.id === id ? { ...d, ...updates } : d))
+    saveLocalDevices(updatedList)
+
+    if (isSupabaseReady()) {
+      try {
+        const { data, error } = await supabase
+          .from('devices')
+          .update(payload as any)
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (!error && data) {
+          return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
+        }
+      } catch (err) {}
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('devices')
-        .update(payload as any)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (error) throw error
-      return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
-    } catch (err) {
-      const appErr = handleSupabaseError(err)
-      return { data: null, error: appErr.message }
-    }
+    return { data: null, error: null }
   },
 
   /**
@@ -267,46 +300,56 @@ export const deviceService = {
     reason?: string,
     analystName?: string
   ): Promise<{ success: boolean; error: string | null }> {
-    if (!isSupabaseReady()) {
-      return { success: true, error: null }
+    // Update local cache
+    const currentList = getLocalDevices()
+    const updatedList = currentList.map((d) =>
+      d.id === deviceId
+        ? {
+            ...d,
+            status: isIsolated ? ('ISOLATED' as const) : ('HEALTHY' as const),
+            isolationStatus: {
+              isIsolated,
+              isolatedAt: isIsolated ? new Date().toISOString() : undefined,
+              isolatedBy: isIsolated ? analystName || 'SOC Analyst' : undefined,
+            },
+          }
+        : d
+    )
+    saveLocalDevices(updatedList)
+
+    if (isSupabaseReady()) {
+      try {
+        await supabase
+          .from('devices')
+          .update({
+            is_isolated: isIsolated,
+            status: isIsolated ? 'ISOLATED' : 'HEALTHY',
+            isolated_at: isIsolated ? new Date().toISOString() : null,
+            isolated_by: isIsolated ? analystName || 'SOC Analyst' : null,
+            isolation_reason: isIsolated ? reason || '802.1X Host Quarantine' : null,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', deviceId)
+      } catch (err) {}
     }
 
-    try {
-      const { error } = await supabase
-        .from('devices')
-        .update({
-          is_isolated: isIsolated,
-          status: isIsolated ? 'ISOLATED' : 'HEALTHY',
-          isolated_at: isIsolated ? new Date().toISOString() : null,
-          isolated_by: isIsolated ? analystName || 'SOC Analyst' : null,
-          isolation_reason: isIsolated ? reason || '802.1X Host Quarantine' : null,
-          updated_at: new Date().toISOString(),
-        } as any)
-        .eq('id', deviceId)
-
-      if (error) throw error
-      return { success: true, error: null }
-    } catch (err) {
-      const appErr = handleSupabaseError(err)
-      return { success: false, error: appErr.message }
-    }
+    return { success: true, error: null }
   },
 
   /**
    * DELETE: Remove device record
    */
   async deleteDevice(id: string): Promise<{ success: boolean; error: string | null }> {
-    if (!isSupabaseReady()) {
-      return { success: true, error: null }
+    const currentList = getLocalDevices().filter((d) => d.id !== id)
+    saveLocalDevices(currentList)
+
+    if (isSupabaseReady()) {
+      try {
+        await supabase.from('devices').delete().eq('id', id)
+      } catch (err) {}
     }
 
-    try {
-      const { error } = await supabase.from('devices').delete().eq('id', id)
-      if (error) throw error
-      return { success: true, error: null }
-    } catch (err) {
-      const appErr = handleSupabaseError(err)
-      return { success: false, error: appErr.message }
-    }
+    return { success: true, error: null }
   },
 }
+

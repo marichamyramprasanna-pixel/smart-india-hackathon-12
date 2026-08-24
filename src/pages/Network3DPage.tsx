@@ -1,10 +1,18 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { NetworkTopologyCanvas } from '../components/network3d/NetworkTopologyCanvas'
-import { demo3DNodes, demo3DLinks } from '../data/demo/network'
-import { Globe, ShieldCheck, Activity } from 'lucide-react'
+import { useDevices } from '../hooks/useDevices'
+import { generateDynamic3DTopology } from '../utils/topologyGenerator'
+import { Globe } from 'lucide-react'
 import { Badge } from '../components/common/Badge'
 
 export const Network3DPage: React.FC = () => {
+  const { devices } = useDevices()
+
+  // Dynamically generate 3D spatial nodes and packet links including user-added devices
+  const { nodes, links } = useMemo(() => {
+    return generateDynamic3DTopology(devices)
+  }, [devices])
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -21,9 +29,12 @@ export const Network3DPage: React.FC = () => {
               <Badge variant="healthy" className="text-[10px] font-mono">
                 WEBGL ACTIVE
               </Badge>
+              <span className="text-xs font-mono text-cyan-400">
+                ({nodes.length} Nodes • {devices.length} Inventory Devices)
+              </span>
             </div>
             <p className="text-xs text-slate-400">
-              Interactive 3D representation of perimeter firewalls, routers, cloud VPCs, servers, and compromised workstations.
+              Interactive 3D representation of perimeter firewalls, routers, cloud VPCs, servers, and all input workstations.
             </p>
           </div>
         </div>
@@ -35,11 +46,12 @@ export const Network3DPage: React.FC = () => {
 
       {/* Large Full-Height 3D Topology Canvas */}
       <NetworkTopologyCanvas
-        nodes={demo3DNodes}
-        links={demo3DLinks}
+        nodes={nodes}
+        links={links}
         height="h-[calc(100vh-220px)] min-h-[580px]"
         enableFullscreen={true}
       />
     </div>
   )
 }
+

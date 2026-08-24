@@ -11,11 +11,12 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card'
 import { Button } from '../common/Button'
 import { Badge } from '../common/Badge'
-import { useDemoScenario } from '../../context/DemoScenarioContext'
+import { useAlerts } from '../../hooks/useAlerts'
 
 export const ThreatOverviewTable: React.FC = () => {
   const navigate = useNavigate()
-  const { threatsList, currentStage } = useDemoScenario()
+  const { alerts } = useAlerts()
+  const threatsList = alerts
 
   return (
     <Card variant="cyber" className="rounded-xl overflow-hidden">
@@ -29,7 +30,7 @@ export const ThreatOverviewTable: React.FC = () => {
               <span>Active Threat Triage</span>
               {threatsList.length > 0 && (
                 <Badge variant="critical" className="text-[10px] ml-2 font-mono">
-                  {threatsList.length} INTERCEPTED
+                  {threatsList.length} ACTIVE
                 </Badge>
               )}
             </CardTitle>

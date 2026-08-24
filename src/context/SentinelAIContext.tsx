@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { AIChatMessage } from '../types/ai'
 import { sendChatMessage } from '../api/ai'
 import { trackEvent } from '../api/analytics'
+import { useDevices } from '../hooks/useDevices'
+import { useAlerts } from '../hooks/useAlerts'
 
 interface ActiveContextInfo {
   type: 'device' | 'threat' | 'network' | 'global'
@@ -28,13 +30,12 @@ const INITIAL_MESSAGE: AIChatMessage = {
   id: 'msg-welcome',
   sender: 'assistant',
   timestamp: new Date().toLocaleTimeString(),
-  content: `Hello, Analyst. I'm **Sentinel AI**.\n\nI can analyze network telemetry, investigate suspicious devices, explain AI behavioral detections, trace attack paths, and generate incident reports.\n\nHow can I assist your investigation?`,
+  content: `Hello, Analyst. I'm **Sentinel AI**.\n\nI can analyze your live device inventory, investigate suspicious endpoints, explain AI behavioral detections, trace attack paths, and generate incident reports.\n\nHow can I assist your investigation?`,
   suggestedActions: [
     { id: 'qa-1', label: 'Investigate Threats', actionType: 'filter_threats' },
-    { id: 'qa-2', label: 'Analyze DEVICE-042', actionType: 'navigate', payload: { path: '/devices/DEVICE-042' } },
-    { id: 'qa-3', label: 'Explain AI Detection', actionType: 'explain_anomaly' },
-    { id: 'qa-4', label: 'Trace Attack Path', actionType: 'navigate', payload: { path: '/attack-graph' } },
-    { id: 'qa-5', label: 'Generate Incident Summary', actionType: 'generate_report' },
+    { id: 'qa-2', label: 'Explain AI Detection', actionType: 'explain_anomaly' },
+    { id: 'qa-3', label: 'Trace Attack Path', actionType: 'navigate', payload: { path: '/attack-graph' } },
+    { id: 'qa-4', label: 'Generate Incident Summary', actionType: 'generate_report' },
   ],
 }
 
@@ -49,6 +50,10 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     type: 'global',
     name: 'Command Center',
   })
+
+  // Pull live inventory data to feed into Sentinel AI context
+  const { devices } = useDevices()
+  const { alerts } = useAlerts()
 
   const toggleOpen = useCallback(() => {
     setIsOpen((prev) => {
@@ -78,6 +83,8 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     trackEvent('ai_question_submitted', { queryLength: text.length, context: currentContext.type })
 
     try {
+      // Pass live devices and alerts into the AI request so it can build
+      // a dynamic, accurate system prompt from the real database state
       const response = await sendChatMessage({
         message: text,
         context: {
@@ -85,6 +92,8 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           id: currentContext.id,
         },
         conversation_id: 'conv-session-01',
+        devices,
+        alerts,
       })
 
       const assistantMsg: AIChatMessage = {
@@ -110,16 +119,31 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setIsLoading(false)
     }
-  }, [currentContext])
+  }, [currentContext, devices, alerts])
 
   const sendQuickAction = useCallback((actionLabel: string) => {
     sendMessage(actionLabel)
   }, [sendMessage])
 
-  // Context updates helper
+  // Optional: update welcome message's suggested actions when live data arrives
   useEffect(() => {
-    // Optional event listening or analytics hook
-  }, [currentContext])
+    const compromised = devices.filter((d) => d.status === 'COMPROMISED')
+    const topDevice = compromised[0] || devices.find((d) => d.status === 'SUSPICIOUS') || devices[0]
+    if (topDevice) {
+      setMessages((prev) => {
+        if (prev.length !== 1 || prev[0].id !== 'msg-welcome') return prev
+        return [{
+          ...prev[0],
+          suggestedActions: [
+            { id: 'qa-1', label: `Investigate ${topDevice.id}`, actionType: 'navigate', payload: { path: `/devices/${topDevice.id}` } },
+            { id: 'qa-2', label: 'Review Active Alerts', actionType: 'filter_threats' },
+            { id: 'qa-3', label: 'Trace Attack Path', actionType: 'navigate', payload: { path: '/attack-graph' } },
+            { id: 'qa-4', label: 'Generate Incident Summary', actionType: 'generate_report' },
+          ],
+        }]
+      })
+    }
+  }, [devices])
 
   return (
     <SentinelAIContext.Provider
