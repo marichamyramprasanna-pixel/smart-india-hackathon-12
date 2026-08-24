@@ -8,11 +8,12 @@ import {
   TrendingUp,
   TrendingDown,
   Info,
+  ShieldCheck,
+  Zap,
 } from 'lucide-react'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
 import { useDevices } from '../../hooks/useDevices'
 import { useAlerts } from '../../hooks/useAlerts'
-import { Card } from '../common/Card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../common/Tooltip'
 
 export const MetricKPICards: React.FC = () => {
@@ -28,60 +29,77 @@ export const MetricKPICards: React.FC = () => {
     (a) => a.status === 'NEW' || a.status === 'INVESTIGATING'
   ).length
 
-  const maxCompromise = devices.length > 0 ? Math.max(...devices.map((d) => d.compromiseProbability || 0)) : 0
-  const calculatedHealth = Math.max(10, Math.round(100 - (suspiciousCount / Math.max(devices.length, 1)) * 40 - (maxCompromise * 0.3)))
-  const calculatedConfidence = devices.length > 0 ? Math.min(99, Math.max(88, Math.round(96 - (maxCompromise * 0.05)))) : 98
+  const maxCompromise =
+    devices.length > 0 ? Math.max(...devices.map((d) => d.compromiseProbability || 0)) : 0
+  const calculatedHealth = Math.max(
+    10,
+    Math.round(100 - (suspiciousCount / Math.max(devices.length, 1)) * 40 - maxCompromise * 0.3)
+  )
+  const calculatedConfidence =
+    devices.length > 0
+      ? Math.min(99, Math.max(88, Math.round(96 - maxCompromise * 0.05)))
+      : 98
 
   const metrics = [
     {
       id: 'kpi-active-devs',
-      label: 'Active Monitored Devices',
+      label: 'Active Endpoints',
       value: activeDeviceCount > 0 ? activeDeviceCount.toString() : '0',
-      trend: `${activeDeviceCount} endpoints`,
-      isPositiveTrend: true,
-      icon: <Laptop className="h-4 w-4 text-cyan-400" />,
-      tooltip: 'Continuous telemetry agents and passive flow sensors monitored across all corporate subnets.',
-      accent: 'border-cyan-500/20 text-cyan-400',
+      trend: `${activeDeviceCount} live telemetry agents`,
+      icon: <Laptop className="h-4 w-4 text-cyan-300" />,
+      tooltip: 'Continuous telemetry agents and flow sensors actively streaming from network subnets.',
+      cardBg: 'from-cyan-950/40 via-slate-900/80 to-slate-950/90 border-cyan-500/30 hover:border-cyan-400/60 shadow-neon-cyan/20 hover:shadow-neon-cyan/40',
+      iconBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+      textColor: 'text-cyan-300',
+      badgeBg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
     },
     {
       id: 'kpi-suspicious-devs',
-      label: 'Suspicious Endpoints',
+      label: 'Suspicious Hosts',
       value: suspiciousCount.toString(),
-      trend: suspiciousCount > 0 ? `+${suspiciousCount} flagged` : '0 nominal',
-      isPositiveTrend: suspiciousCount === 0,
-      icon: <AlertTriangle className="h-4 w-4 text-orange-400" />,
-      tooltip: 'Endpoints with statistical behavioral deviations exceeding 2.5 standard deviations from baselines.',
-      accent: 'border-orange-500/30 text-orange-400',
+      trend: suspiciousCount > 0 ? `+${suspiciousCount} flagged anomaly` : '0 nominal variance',
+      icon: <AlertTriangle className="h-4 w-4 text-amber-300" />,
+      tooltip: 'Endpoints with statistical behavioral deviations exceeding 2.5 sigma baseline.',
+      cardBg: 'from-amber-950/40 via-slate-900/80 to-slate-950/90 border-amber-500/30 hover:border-amber-400/60 shadow-neon-amber/20 hover:shadow-neon-amber/40',
+      iconBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      textColor: 'text-amber-300',
+      badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     },
     {
       id: 'kpi-active-threats',
       label: 'Active Threats',
       value: activeAlertCount.toString(),
-      trend: activeAlertCount > 0 ? 'Elevated' : 'None',
-      isPositiveTrend: activeAlertCount === 0,
-      icon: <Flame className="h-4 w-4 text-red-400" />,
+      trend: activeAlertCount > 0 ? 'CRITICAL Containment' : '0 Hostile IoCs',
+      icon: <Flame className="h-4 w-4 text-red-400 animate-pulse" />,
       tooltip: 'Correlated multi-vector security incidents requiring SOC analyst triage or containment.',
-      accent: 'border-red-500/30 text-red-400',
+      cardBg: 'from-red-950/50 via-slate-900/80 to-slate-950/90 border-red-500/40 hover:border-red-400/70 shadow-neon-red/25 hover:shadow-neon-red/50',
+      iconBg: 'bg-red-500/20 text-red-400 border-red-500/40',
+      textColor: 'text-red-400',
+      badgeBg: 'bg-red-500/20 text-red-300 border-red-500/40',
     },
     {
       id: 'kpi-network-health',
-      label: 'Network Baseline Health',
+      label: 'Network Health',
       value: `${calculatedHealth}%`,
-      trend: calculatedHealth >= 80 ? 'Nominal' : 'Degraded',
-      isPositiveTrend: calculatedHealth >= 80,
-      icon: <Activity className="h-4 w-4 text-emerald-400" />,
+      trend: calculatedHealth >= 80 ? 'Optimal Stability' : 'Elevated Risk',
+      icon: <Activity className="h-4 w-4 text-emerald-300" />,
       tooltip: 'Composite telemetry stability index across DNS, NetFlow, and authentication integrity.',
-      accent: 'border-emerald-500/20 text-emerald-400',
+      cardBg: 'from-emerald-950/40 via-slate-900/80 to-slate-950/90 border-emerald-500/30 hover:border-emerald-400/60 shadow-neon-emerald/20 hover:shadow-neon-emerald/40',
+      iconBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      textColor: 'text-emerald-300',
+      badgeBg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     },
     {
       id: 'kpi-ai-confidence',
-      label: 'AI Detection Confidence',
+      label: 'AI Model Accuracy',
       value: `${calculatedConfidence}%`,
-      trend: 'Calibrated',
-      isPositiveTrend: true,
-      icon: <BrainCircuit className="h-4 w-4 text-purple-400" />,
+      trend: 'Bayesian Calibrated',
+      icon: <BrainCircuit className="h-4 w-4 text-purple-300" />,
       tooltip: 'Bayesian posterior confidence calibrated across continuous multivariate unsupervised learning models.',
-      accent: 'border-purple-500/20 text-purple-400',
+      cardBg: 'from-purple-950/40 via-slate-900/80 to-slate-950/90 border-purple-500/30 hover:border-purple-400/60 shadow-neon-purple/20 hover:shadow-neon-purple/40',
+      iconBg: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+      textColor: 'text-purple-300',
+      badgeBg: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
     },
   ]
 
@@ -89,50 +107,54 @@ export const MetricKPICards: React.FC = () => {
     <TooltipProvider delayDuration={200}>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {metrics.map((m) => (
-          <Card
+          <div
             key={m.id}
-            variant="cyber"
-            className="p-3.5 rounded-xl flex flex-col justify-between space-y-2 hover:border-cyan-500/40 transition-colors"
+            className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${m.cardBg} p-4 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1`}
           >
-            {/* Top row: Label + Icon + Tooltip */}
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-[11px] font-medium text-slate-400 line-clamp-1">
+            {/* Top row: Label + Pod Icon + Info */}
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-300 font-semibold line-clamp-1">
                 {m.label}
               </span>
-              <div className="flex items-center gap-1 shrink-0">
-                {m.icon}
+
+              <div className="flex items-center gap-1.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button className="text-slate-500 hover:text-slate-300" aria-label="Metric Info">
-                      <Info className="h-3 w-3" />
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-slate-200 transition-colors"
+                      aria-label="Info"
+                    >
+                      <Info className="h-3 w-3 opacity-60 hover:opacity-100" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">
+                  <TooltipContent side="top" className="max-w-[220px] text-xs">
                     {m.tooltip}
                   </TooltipContent>
                 </Tooltip>
+
+                <div className={`p-1.5 rounded-lg border ${m.iconBg}`}>
+                  {m.icon}
+                </div>
               </div>
             </div>
 
-            {/* Bottom Row: Dynamic Value + Trend indicator */}
-            <div className="flex items-baseline justify-between pt-1">
-              <span className="text-xl sm:text-2xl font-mono font-bold text-slate-100 tracking-tight">
+            {/* Middle row: Big Glowing Number */}
+            <div className="flex items-baseline justify-between gap-2 mt-1">
+              <span
+                className={`text-2xl sm:text-3xl font-display font-extrabold font-mono-numbers tracking-tight ${m.textColor}`}
+              >
                 {m.value}
               </span>
-              <span
-                className={`text-[10px] font-mono font-medium flex items-center gap-0.5 ${
-                  m.isPositiveTrend ? 'text-emerald-400' : 'text-orange-400'
-                }`}
-              >
-                {m.isPositiveTrend ? (
-                  <TrendingUp className="h-2.5 w-2.5" />
-                ) : (
-                  <TrendingDown className="h-2.5 w-2.5" />
-                )}
+            </div>
+
+            {/* Bottom row: Trend Chip */}
+            <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+              <span className={`px-2 py-0.5 rounded-full font-mono font-medium border ${m.badgeBg}`}>
                 {m.trend}
               </span>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
     </TooltipProvider>
