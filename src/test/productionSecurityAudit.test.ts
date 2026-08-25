@@ -20,6 +20,15 @@ describe('Production Readiness & Security Audit', () => {
     expect(envExampleContent).not.toContain('password123')
   })
 
+  it('confirms index.html includes essential security headers and meta tags', () => {
+    const indexPath = path.resolve(__dirname, '../../index.html')
+    expect(fs.existsSync(indexPath)).toBe(true)
+    const indexContent = fs.readFileSync(indexPath, 'utf8')
+    expect(indexContent).toContain('nosniff')
+    expect(indexContent).toContain('strict-origin-when-cross-origin')
+    expect(indexContent).toContain('X-XSS-Protection')
+  })
+
   it('confirms no source files expose service-role keys or hardcoded admin passwords', () => {
     const srcDir = path.resolve(__dirname, '../')
 

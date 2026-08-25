@@ -189,7 +189,10 @@ export const gmailAlertService = {
     // Automatically trigger Gmail compose window if auto-send is enabled and in browser environment
     if (autoOpenCompose && isGmailAutoSendEnabled() && typeof window !== 'undefined') {
       try {
-        window.open(composeUrl, '_blank', 'noopener,noreferrer')
+        const parsed = new URL(composeUrl)
+        if (parsed.protocol === 'https:' && parsed.hostname === 'mail.google.com') {
+          window.open(composeUrl, '_blank', 'noopener,noreferrer')
+        }
       } catch {}
     }
 
@@ -205,7 +208,12 @@ export const gmailAlertService = {
    */
   openGmailCompose(composeUrl: string): void {
     if (typeof window !== 'undefined') {
-      window.open(composeUrl, '_blank', 'noopener,noreferrer')
+      try {
+        const parsed = new URL(composeUrl)
+        if (parsed.protocol === 'https:' && parsed.hostname === 'mail.google.com') {
+          window.open(composeUrl, '_blank', 'noopener,noreferrer')
+        }
+      } catch {}
     }
   },
 

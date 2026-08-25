@@ -7,9 +7,9 @@ import { Tables, InsertDto, UpdateDto } from '../types/database'
 
 // Validation Schemas using Zod
 export const deviceCreateSchema = z.object({
-  id: z.string().min(2, 'Device ID is required (e.g. DEVICE-001)'),
-  hostname: z.string().min(2, 'Hostname is required'),
-  ip_address: z.string().regex(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/, 'Must be a valid IPv4 address'),
+  id: z.string().min(2, 'Device ID is required (e.g. DEVICE-001)').max(64),
+  hostname: z.string().min(2, 'Hostname is required').max(128),
+  ip_address: z.string().regex(/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/, 'Must be a valid IPv4 address (0.0.0.0 - 255.255.255.255)'),
   mac_address: z.string().optional().default('00:00:00:00:00:00'),
   os: z.string().optional().default('Windows 11 Enterprise'),
   device_type: z.enum(['Workstation', 'Server', 'Laptop', 'IoT', 'Router', 'Firewall', 'Cloud', 'External']).default('Workstation'),
