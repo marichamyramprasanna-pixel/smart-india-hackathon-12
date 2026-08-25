@@ -5,16 +5,13 @@ import {
   Flame,
   Activity,
   BrainCircuit,
-  TrendingUp,
-  TrendingDown,
   Info,
-  ShieldCheck,
-  Zap,
 } from 'lucide-react'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
 import { useDevices } from '../../hooks/useDevices'
 import { useAlerts } from '../../hooks/useAlerts'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../common/Tooltip'
+import { SpotlightCard } from '../common/SpotlightCard'
 
 export const MetricKPICards: React.FC = () => {
   const { currentStage } = useDemoScenario()
@@ -52,6 +49,7 @@ export const MetricKPICards: React.FC = () => {
       iconBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
       textColor: 'text-cyan-300',
       badgeBg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+      spotlightColor: 'cyan' as const,
     },
     {
       id: 'kpi-suspicious-devs',
@@ -64,6 +62,7 @@ export const MetricKPICards: React.FC = () => {
       iconBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
       textColor: 'text-amber-300',
       badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+      spotlightColor: 'amber' as const,
     },
     {
       id: 'kpi-active-threats',
@@ -76,6 +75,7 @@ export const MetricKPICards: React.FC = () => {
       iconBg: 'bg-red-500/20 text-red-400 border-red-500/40',
       textColor: 'text-red-400',
       badgeBg: 'bg-red-500/20 text-red-300 border-red-500/40',
+      spotlightColor: 'red' as const,
     },
     {
       id: 'kpi-network-health',
@@ -88,6 +88,7 @@ export const MetricKPICards: React.FC = () => {
       iconBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
       textColor: 'text-emerald-300',
       badgeBg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+      spotlightColor: 'emerald' as const,
     },
     {
       id: 'kpi-ai-confidence',
@@ -100,6 +101,7 @@ export const MetricKPICards: React.FC = () => {
       iconBg: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
       textColor: 'text-purple-300',
       badgeBg: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+      spotlightColor: 'purple' as const,
     },
   ]
 
@@ -107,9 +109,12 @@ export const MetricKPICards: React.FC = () => {
     <TooltipProvider delayDuration={200}>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {metrics.map((m) => (
-          <div
+          <SpotlightCard
             key={m.id}
-            className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${m.cardBg} p-4 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1`}
+            tilt={true}
+            maxTilt={5}
+            spotlightColor={m.spotlightColor}
+            className={`relative rounded-2xl border bg-gradient-to-br ${m.cardBg} p-4 backdrop-blur-xl transition-all duration-300`}
           >
             {/* Top row: Label + Pod Icon + Info */}
             <div className="flex items-center justify-between gap-2 mb-2">
@@ -154,7 +159,7 @@ export const MetricKPICards: React.FC = () => {
                 {m.trend}
               </span>
             </div>
-          </div>
+          </SpotlightCard>
         ))}
       </div>
     </TooltipProvider>

@@ -3,16 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import {
   BrainCircuit,
   User,
-  ShieldAlert,
   ArrowRight,
-  Lock,
-  Network,
-  Clock,
-  FileText,
-  CheckCircle,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { AIChatMessage } from '../../types/ai'
-import { Button } from '../common/Button'
 import { Badge } from '../common/Badge'
 import { useInvestigation } from '../../context/InvestigationContext'
 
@@ -20,15 +15,19 @@ interface ChatMessageListProps {
   messages: AIChatMessage[]
   isLoading: boolean
   onActionClick: (action: { id: string; label: string; actionType?: string; payload?: Record<string, unknown> }) => void
+  onSpeakText?: (text: string) => void
+  isSpeaking?: boolean
 }
 
 export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   messages,
   isLoading,
   onActionClick,
+  onSpeakText,
+  isSpeaking = false,
 }) => {
   const navigate = useNavigate()
-  const { isolateDevice, isDeviceIsolated } = useInvestigation()
+  const { isolateDevice } = useInvestigation()
 
   const handleAction = (act: any) => {
     if (act.actionType === 'navigate' && act.payload?.path) {
@@ -123,12 +122,25 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   : 'bg-slate-900/90 text-slate-100 border border-slate-800 rounded-tl-none shadow-md'
               }`}
             >
-              {/* Header Timestamp */}
+              {/* Header Timestamp & Voice Speak Action */}
               <div className="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-800/60 pb-1">
                 <span className="font-mono font-medium">
                   {isUser ? 'Analyst' : 'Sentinel AI (Probabilistic SOC Engine)'}
                 </span>
-                <span className="font-mono">{msg.timestamp}</span>
+                
+                <div className="flex items-center gap-2">
+                  {!isUser && onSpeakText && (
+                    <button
+                      onClick={() => onSpeakText(msg.content)}
+                      className="p-0.5 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+                      title="Read aloud with Voice Assistant"
+                      aria-label="Read aloud"
+                    >
+                      <Volume2 className="h-3 w-3" />
+                    </button>
+                  )}
+                  <span className="font-mono">{msg.timestamp}</span>
+                </div>
               </div>
 
               {/* Message Content */}

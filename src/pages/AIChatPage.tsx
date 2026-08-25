@@ -4,30 +4,31 @@ import {
   BrainCircuit,
   Send,
   Sparkles,
-  Zap,
   Trash2,
   Lock,
   Unlock,
   ArrowRight,
-  ShieldAlert,
   Laptop,
   Server,
   FileText,
-  Clock,
-  CheckCircle,
   Radio,
   ExternalLink,
   ChevronRight,
   Flame,
-  Search,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
+import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { useSentinelAI } from '../context/SentinelAIContext'
 import { useInvestigation } from '../context/InvestigationContext'
 import { useDevices } from '../hooks/useDevices'
 import { useAlerts } from '../hooks/useAlerts'
+import { useVoiceAssistant } from '../hooks/useVoiceAssistant'
+import { VoiceWaveVisualizer } from '../components/ai-assistant/VoiceWaveVisualizer'
 
 export const AIChatPage: React.FC = () => {
   const navigate = useNavigate()
@@ -35,7 +36,6 @@ export const AIChatPage: React.FC = () => {
     messages,
     isLoading,
     currentContext,
-    setCurrentContext,
     sendMessage,
     clearChat,
   } = useSentinelAI()
@@ -52,6 +52,48 @@ export const AIChatPage: React.FC = () => {
 
   const [inputVal, setInputVal] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const lastSpokenMessageIdRef = useRef<string | null>(null)
+
+  const {
+    isListening,
+    isSpeaking,
+    transcript,
+    autoSpeak,
+    error,
+    startListening,
+    stopListening,
+    speakText,
+    stopSpeaking,
+    toggleAutoSpeak,
+  } = useVoiceAssistant((finalTranscript) => {
+    if (finalTranscript.trim()) {
+      setInputVal(finalTranscript)
+      sendMessage(finalTranscript)
+      setInputVal('')
+    }
+  })
+
+  // Auto-speak new assistant responses when autoSpeak is on
+  useEffect(() => {
+    if (!autoSpeak) return
+    const lastMsg = messages[messages.length - 1]
+    if (
+      lastMsg &&
+      lastMsg.sender === 'assistant' &&
+      lastMsg.id !== lastSpokenMessageIdRef.current &&
+      !isLoading
+    ) {
+      lastSpokenMessageIdRef.current = lastMsg.id
+      speakText(lastMsg.content)
+    }
+  }, [messages, isLoading, autoSpeak, speakText])
+
+  // Sync interim speech transcription into input field
+  useEffect(() => {
+    if (isListening && transcript) {
+      setInputVal(transcript)
+    }
+  }, [isListening, transcript])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -60,6 +102,7 @@ export const AIChatPage: React.FC = () => {
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputVal.trim() || isLoading) return
+    if (isListening) stopListening()
     sendMessage(inputVal)
     setInputVal('')
   }
@@ -178,16 +221,29 @@ export const AIChatPage: React.FC = () => {
               </h1>
               <Badge variant="ai" className="text-[10px] font-mono">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
-                PROBABILISTIC MODEL ONLINE
+                VOICE ASSISTANT ONLINE
               </Badge>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Context-aware autonomous cybersecurity assistant trained on multivariate network baselines, IoC telemetry, and MITRE ATT&CK tactics.
+              Voice-enabled cybersecurity assistant trained on multivariate network baselines, IoC telemetry, and MITRE ATT&CK tactics.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={toggleAutoSpeak}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-all ${
+              autoSpeak
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-neon-cyan/20'
+                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+            title={autoSpeak ? 'Voice Response: ON (Auto Read Aloud)' : 'Voice Response: OFF (Click to Enable)'}
+          >
+            {autoSpeak ? <Volume2 className="h-3.5 w-3.5 animate-pulse text-cyan-300" /> : <VolumeX className="h-3.5 w-3.5" />}
+            <span>{autoSpeak ? 'Voice: ON' : 'Voice: OFF'}</span>
+          </button>
+
           <Button
             variant="outline"
             size="sm"
@@ -310,7 +366,20 @@ export const AIChatPage: React.FC = () => {
                   >
                     <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5 font-mono">
                       <span>{isUser ? 'SOC Analyst' : 'Sentinel AI (Probabilistic Intelligence Engine)'}</span>
-                      <span>{msg.timestamp}</span>
+                      
+                      <div className="flex items-center gap-2">
+                        {!isUser && (
+                          <button
+                            onClick={() => speakText(msg.content)}
+                            className="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+                            title="Read aloud with Voice Assistant"
+                            aria-label="Read aloud"
+                          >
+                            <Volume2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <span>{msg.timestamp}</span>
+                      </div>
                     </div>
 
                     {renderMessageContent(msg.content)}
@@ -384,18 +453,51 @@ export const AIChatPage: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Voice Waveform Visualizer */}
+          <VoiceWaveVisualizer
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            transcript={transcript}
+            error={error}
+            onStopListening={stopListening}
+            onStopSpeaking={stopSpeaking}
+          />
+
           {/* Chat Input Console */}
           <form
             onSubmit={handleSend}
             className="p-3.5 border-t border-slate-800 bg-slate-900/95 flex items-center gap-2.5"
           >
+            {/* Voice Input Microphone Button */}
+            <button
+              type="button"
+              onClick={isListening ? stopListening : startListening}
+              className={`h-10 w-10 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                isListening
+                  ? 'bg-rose-500/25 border-rose-500/60 text-rose-300 animate-pulse shadow-neon-red/30'
+                  : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/50'
+              }`}
+              title={isListening ? 'Stop recording voice' : 'Speak to Sentinel AI (Voice Assistant)'}
+              aria-label="Voice Input"
+            >
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </button>
+
             <input
               type="text"
-              placeholder="Ask Sentinel AI to analyze telemetry, trace C2 hops, explain anomalies, or isolate host..."
+              placeholder={
+                isListening
+                  ? 'Listening to your voice prompt...'
+                  : 'Ask Sentinel AI to analyze telemetry, trace C2 hops, explain anomalies, or speak via mic...'
+              }
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               disabled={isLoading}
-              className="flex-1 h-10 rounded-xl border border-slate-700 bg-slate-950 px-4 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-purple-400"
+              className={`flex-1 h-10 rounded-xl border bg-slate-950 px-4 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none ${
+                isListening
+                  ? 'border-rose-500/60 ring-1 ring-rose-500/40 text-rose-200'
+                  : 'border-slate-700 focus:border-purple-400'
+              }`}
             />
             <Button
               variant="ai"

@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Search,
   Bell,
-  Sun,
-  Moon,
-  Laptop,
   Menu,
   Shield,
   Activity,
@@ -15,7 +12,6 @@ import {
   LogOut,
   LogIn,
 } from 'lucide-react'
-import { useTheme } from '../../context/ThemeContext'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -39,7 +35,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenCommandPalette,
 }) => {
   const navigate = useNavigate()
-  const { theme, setTheme, resolvedTheme } = useTheme()
   const { currentStage } = useDemoScenario()
   const { toggleOpen, isOpen: isAiChatOpen } = useSentinelAI()
   const { user, profile, isAuthenticated, isSupabaseConnected, signOut } = useAuth()
@@ -72,7 +67,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         </button>
       </div>
 
-      {/* Right Section: Status Pills, Supabase Badge, Sentinel AI, Notifications, Theme, Profile */}
+      {/* Right Section: Status Pills, Supabase Badge, Sentinel AI, Notifications, Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Supabase Connection Status Badge */}
         <div
@@ -129,38 +124,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             <NotificationCenter onClose={() => setIsNotificationsOpen(false)} />
           )}
         </div>
-
-        {/* Theme Toggle Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8.5 w-8.5 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-850"
-              aria-label="Toggle Theme"
-            >
-              {resolvedTheme === 'dark' ? (
-                <Moon className="h-4 w-4" />
-              ) : (
-                <Sun className="h-4 w-4" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-36">
-            <DropdownMenuItem onClick={() => setTheme('dark')} className="gap-2">
-              <Moon className="h-3.5 w-3.5" />
-              <span>Dark Theme</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme('light')} className="gap-2">
-              <Sun className="h-3.5 w-3.5" />
-              <span>Light Theme</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme('system')} className="gap-2">
-              <Laptop className="h-3.5 w-3.5" />
-              <span>System</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
 
         {/* Analyst Account Dropdown */}
         <DropdownMenu>

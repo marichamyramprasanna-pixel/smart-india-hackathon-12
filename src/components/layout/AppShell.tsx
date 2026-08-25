@@ -7,7 +7,7 @@ import { LiveThreatTicker } from './LiveThreatTicker'
 import { CommandPalette } from './CommandPalette'
 import { CyberCursor } from '../common/CyberCursor'
 import { ScrollEffects } from '../common/ScrollEffects'
-import { ScrollVelocityBeam } from '../common/ScrollVelocityBeam'
+import { ScrollParticleMatrix } from '../common/ScrollParticleMatrix'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 
@@ -34,13 +34,13 @@ export const AppShell: React.FC = () => {
   }, [toggleAiChat])
 
   return (
-    <div className="relative flex min-h-screen bg-[#030712] text-foreground overflow-x-hidden">
-      {/* Background Cyber Grid & Radiant Colorful Atmospheric Glows */}
-      <div className="fixed inset-0 pointer-events-none bg-cyber-grid bg-grid-24 opacity-30 z-0" />
-      <div className="fixed -top-32 -left-32 h-[32rem] w-[32rem] rounded-full bg-cyan-500/15 blur-[140px] pointer-events-none z-0" />
-      <div className="fixed top-1/4 -right-32 h-[32rem] w-[32rem] rounded-full bg-purple-600/15 blur-[150px] pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-1/3 h-[28rem] w-[28rem] rounded-full bg-emerald-500/10 blur-[140px] pointer-events-none z-0" />
-      <div className="fixed top-2/3 right-1/4 h-[24rem] w-[24rem] rounded-full bg-rose-500/10 blur-[130px] pointer-events-none z-0" />
+    <div className="relative flex min-h-screen bg-[#02040a] text-slate-100 overflow-x-hidden">
+      {/* Deep Obsidian Background Cyber Grid & Vibrant Atmospheric Neon Glows */}
+      <div className="fixed inset-0 pointer-events-none bg-cyber-grid bg-grid-24 opacity-35 z-0" />
+      <div className="fixed -top-32 -left-32 h-[34rem] w-[34rem] rounded-full bg-cyan-500/15 blur-[140px] pointer-events-none z-0" />
+      <div className="fixed top-1/4 -right-32 h-[34rem] w-[34rem] rounded-full bg-purple-600/15 blur-[150px] pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-1/3 h-[30rem] w-[30rem] rounded-full bg-emerald-500/10 blur-[140px] pointer-events-none z-0" />
+      <div className="fixed top-2/3 right-1/4 h-[26rem] w-[26rem] rounded-full bg-rose-500/10 blur-[130px] pointer-events-none z-0" />
 
       {/* Persistent Left Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -80,8 +80,8 @@ export const AppShell: React.FC = () => {
       {/* Dynamic Scroll Progress & Floating Top Button */}
       <ScrollEffects />
 
-      {/* Holographic Scroll Velocity Laser Beam & Parallax HUD */}
-      <ScrollVelocityBeam />
+      {/* Cyber Particle Sparks & Matrix Rain Stream Canvas on Scroll */}
+      <ScrollParticleMatrix />
     </div>
   )
 }

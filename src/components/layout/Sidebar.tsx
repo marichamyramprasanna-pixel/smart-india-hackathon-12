@@ -13,7 +13,6 @@ import {
   Settings,
   HelpCircle,
   ShieldCheck,
-  Zap,
   Bot,
   X,
 } from 'lucide-react'
@@ -92,7 +91,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       href: '/ai-chat',
       icon: <Bot className="h-4 w-4 text-fuchsia-400" />,
       color: 'hover:text-fuchsia-300 hover:bg-fuchsia-950/40 border-fuchsia-500/30',
-      badge: 'GPT-4o',
+      badge: 'VOICE 🎙️',
     },
     {
       name: 'Forensic Reports',
@@ -107,7 +106,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       color: 'hover:text-slate-200 hover:bg-slate-900/60 border-slate-700',
     },
     {
-      name: 'Platform FAQ & Architecture',
+      name: 'Platform Architecture',
       href: '/faq',
       icon: <HelpCircle className="h-4 w-4 text-slate-400" />,
       color: 'hover:text-slate-200 hover:bg-slate-900/60 border-slate-700',
@@ -146,7 +145,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                   {productConfig.brand.name}
                 </span>
                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                  v3.4
+                  v3.5
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-mono tracking-tight">
@@ -165,7 +164,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         </div>
 
         {/* Live Status Pill Bar */}
-        <div className="px-4 py-2.5 border-b border-slate-800/60 bg-gradient-to-r from-slate-900/90 to-slate-950/90">
+        <div className="px-4 py-2 border-b border-slate-800/60 bg-gradient-to-r from-slate-900/90 to-slate-950/90">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -181,7 +180,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-none">
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scrollbar-none">
           {navItems.map((item) => (
             <NavLink
               key={item.href}
@@ -189,22 +188,22 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               onClick={() => onClose()}
               className={({ isActive }) =>
                 cn(
-                  'group flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition-all duration-200 border',
+                  'group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 border',
                   isActive
                     ? 'border-cyan-500/50 bg-gradient-to-r from-cyan-950/60 via-slate-900/90 to-purple-950/40 text-cyan-200 shadow-neon-cyan/20'
                     : `border-transparent text-slate-400 hover:text-slate-200 ${item.color}`
                 )
               }
             >
-              <div className="flex items-center gap-3">
-                <div className="p-1 rounded-lg bg-slate-900/80 border border-slate-800 group-hover:border-slate-700 transition-colors">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-1 rounded-lg bg-slate-900/80 border border-slate-800 group-hover:border-slate-700 transition-colors shrink-0">
                   {item.icon}
                 </div>
-                <span>{item.name}</span>
+                <span className="truncate">{item.name}</span>
               </div>
 
               {item.badge && (
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
                   {item.badge}
                 </span>
               )}
@@ -213,7 +212,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         </nav>
 
         {/* Analyst Footer */}
-        <div className="p-3.5 border-t border-slate-800/80 bg-slate-950/90">
+        <div className="p-3 border-t border-slate-800/80 bg-slate-950/90">
           <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/80 border border-slate-800">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center font-mono font-bold text-xs text-white shadow-neon-purple/30">
               SOC

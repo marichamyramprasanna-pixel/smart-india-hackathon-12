@@ -3,18 +3,21 @@ import {
   BrainCircuit,
   X,
   Minus,
-  Maximize2,
   Send,
-  Sparkles,
-  Zap,
   Trash2,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 import { ChatMessageList } from './ChatMessageList'
 import { QuickActionChips } from './QuickActionChips'
 import { ContextIndicator } from './ContextIndicator'
+import { VoiceWaveVisualizer } from './VoiceWaveVisualizer'
 import { Button } from '../common/Button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../common/Tooltip'
+import { useVoiceAssistant } from '../../hooks/useVoiceAssistant'
 
 export const SentinelAIChat: React.FC = () => {
   const {
@@ -32,6 +35,50 @@ export const SentinelAIChat: React.FC = () => {
 
   const [inputVal, setInputVal] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const lastSpokenMessageIdRef = useRef<string | null>(null)
+
+  const {
+    isListening,
+    isSpeaking,
+    transcript,
+    isSupported,
+    autoSpeak,
+    error,
+    startListening,
+    stopListening,
+    speakText,
+    stopSpeaking,
+    toggleAutoSpeak,
+  } = useVoiceAssistant((finalTranscript) => {
+    if (finalTranscript.trim()) {
+      setInputVal(finalTranscript)
+      // Auto-send voice queries
+      sendMessage(finalTranscript)
+      setInputVal('')
+    }
+  })
+
+  // Auto-speak new assistant responses when autoSpeak is on
+  useEffect(() => {
+    if (!autoSpeak) return
+    const lastMsg = messages[messages.length - 1]
+    if (
+      lastMsg &&
+      lastMsg.sender === 'assistant' &&
+      lastMsg.id !== lastSpokenMessageIdRef.current &&
+      !isLoading
+    ) {
+      lastSpokenMessageIdRef.current = lastMsg.id
+      speakText(lastMsg.content)
+    }
+  }, [messages, isLoading, autoSpeak, speakText])
+
+  // Reflect interim voice transcript into input field while speaking
+  useEffect(() => {
+    if (isListening && transcript) {
+      setInputVal(transcript)
+    }
+  }, [isListening, transcript])
 
   useEffect(() => {
     if (isOpen && !isMinimized && inputRef.current) {
@@ -42,6 +89,7 @@ export const SentinelAIChat: React.FC = () => {
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputVal.trim() || isLoading) return
+    if (isListening) stopListening()
     sendMessage(inputVal)
     setInputVal('')
   }
@@ -67,14 +115,14 @@ export const SentinelAIChat: React.FC = () => {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left" className="font-semibold text-xs">
-                Ask Sentinel AI (⌘/)
+                Ask Sentinel AI (⌘/) • Voice Enabled 🎙️
               </TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>
       )}
 
-      {/* Floating Chat Panel (420px x 650px desktop, full-screen on mobile) */}
+      {/* Floating Chat Panel */}
       {isOpen && (
         <div
           className={`fixed z-50 transition-all duration-200 ${
@@ -100,13 +148,25 @@ export const SentinelAIChat: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[10px] text-purple-300 font-mono">
-                  AI Security Analyst Copilot
+                  Voice-Enabled Security Analyst Copilot
                 </p>
               </div>
             </div>
 
-            {/* Window controls */}
+            {/* Window controls & Voice Speaker Toggle */}
             <div className="flex items-center gap-1">
+              <button
+                onClick={toggleAutoSpeak}
+                className={`p-1.5 rounded transition-colors ${
+                  autoSpeak
+                    ? 'text-cyan-300 bg-cyan-500/20 border border-cyan-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title={autoSpeak ? 'Voice Response: ON (Auto Read Aloud)' : 'Voice Response: OFF (Click to Enable)'}
+              >
+                {autoSpeak ? <Volume2 className="h-3.5 w-3.5 animate-pulse" /> : <VolumeX className="h-3.5 w-3.5" />}
+              </button>
+
               <button
                 onClick={clearChat}
                 className="p-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800"
@@ -122,7 +182,11 @@ export const SentinelAIChat: React.FC = () => {
                 <Minus className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  stopSpeaking()
+                  stopListening()
+                  setIsOpen(false)
+                }}
                 className="p-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800"
                 title="Close AI Copilot"
               >
@@ -141,25 +205,61 @@ export const SentinelAIChat: React.FC = () => {
                 messages={messages}
                 isLoading={isLoading}
                 onActionClick={(act) => sendMessage(act.label)}
+                onSpeakText={speakText}
+                isSpeaking={isSpeaking}
+              />
+
+              {/* Live Voice Audio Waveform & Speech Visualizer */}
+              <VoiceWaveVisualizer
+                isListening={isListening}
+                isSpeaking={isSpeaking}
+                transcript={transcript}
+                error={error}
+                onStopListening={stopListening}
+                onStopSpeaking={stopSpeaking}
               />
 
               {/* Quick Action Chips */}
               <QuickActionChips onSelectAction={(prompt) => sendMessage(prompt)} />
 
-              {/* Chat Input Bar */}
+              {/* Chat Input Bar with Microphone Trigger */}
               <form
                 onSubmit={handleSend}
                 className="p-3 border-t border-slate-800 bg-slate-900/90 flex items-center gap-2"
               >
+                {/* Voice Input Microphone Button */}
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  className={`h-9 w-9 shrink-0 flex items-center justify-center rounded-md border transition-all ${
+                    isListening
+                      ? 'bg-rose-500/25 border-rose-500/60 text-rose-300 animate-pulse shadow-neon-red/30'
+                      : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/50'
+                  }`}
+                  title={isListening ? 'Stop recording voice' : 'Speak to Sentinel AI (Voice Assistant)'}
+                  aria-label="Voice Input"
+                >
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
+
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Ask Sentinel AI to analyze, explain, or triage..."
+                  placeholder={
+                    isListening
+                      ? 'Listening to your voice command...'
+                      : 'Ask Sentinel AI or tap mic to speak...'
+                  }
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   disabled={isLoading}
-                  className="flex-1 h-9 rounded-md border border-slate-700 bg-slate-950 px-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-purple-400"
+                  className={`flex-1 h-9 rounded-md border bg-slate-950 px-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none ${
+                    isListening
+                      ? 'border-rose-500/60 ring-1 ring-rose-500/40 text-rose-200'
+                      : 'border-slate-700 focus:border-purple-400'
+                  }`}
                 />
+
                 <Button
                   variant="ai"
                   size="sm"
