@@ -21,6 +21,7 @@ import { BlockedDevicesPage } from './pages/BlockedDevicesPage'
 import { DeletedDevicesPage } from './pages/DeletedDevicesPage'
 import { AIAnalysisPage } from './pages/AIAnalysisPage'
 import { AIChatPage } from './pages/AIChatPage'
+import { GmailDispatchPage } from './pages/GmailDispatchPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { FaqLandingPage } from './pages/FaqLandingPage'
@@ -71,6 +72,7 @@ export const App: React.FC = () => {
                       <Route path="deleted-devices" element={<DeletedDevicesPage />} />
                       <Route path="ai-analysis" element={<AIAnalysisPage />} />
                       <Route path="ai-chat" element={<AIChatPage />} />
+                      <Route path="gmail-dispatch" element={<GmailDispatchPage />} />
                       <Route path="reports" element={<ReportsPage />} />
                       <Route path="settings" element={<SettingsPage />} />
                       <Route path="faq" element={<FaqLandingPage />} />

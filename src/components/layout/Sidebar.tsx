@@ -16,6 +16,7 @@ import {
   ShieldBan,
   Archive,
   Bot,
+  Mail,
   X,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
@@ -110,6 +111,13 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       badge: 'VOICE 🎙️',
     },
     {
+      name: 'Gmail & PDF Dispatch',
+      href: '/gmail-dispatch',
+      icon: <Mail className="h-4 w-4 text-red-400" />,
+      color: 'hover:text-red-300 hover:bg-red-950/40 border-red-500/30',
+      badge: 'GMAIL / PDF',
+    },
+    {
       name: 'Forensic Reports',
       href: '/reports',
       icon: <FileText className="h-4 w-4 text-teal-400" />,
@@ -124,120 +132,119 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     {
       name: 'Platform Architecture',
       href: '/faq',
-      icon: <HelpCircle className="h-4 w-4 text-slate-400" />,
-      color: 'hover:text-slate-200 hover:bg-slate-900/60 border-slate-700',
+      icon: <HelpCircle className="h-4 w-4 text-cyan-400" />,
+      color: 'hover:text-cyan-300 hover:bg-cyan-950/40 border-cyan-500/30',
     },
   ]
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden animate-in fade-in"
           onClick={onClose}
         />
       )}
 
+      {/* Sidebar Navigation Panel */}
       <aside
         className={cn(
-          'fixed top-0 bottom-0 left-0 z-50 flex w-64 flex-col bg-slate-950/95 lg:bg-slate-950/85 backdrop-blur-2xl border-r border-slate-800/80 transition-transform duration-300 lg:translate-x-0 shadow-2xl',
+          'fixed top-0 bottom-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-[#020617] backdrop-blur-xl transition-transform duration-300 ease-in-out lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Brand Header */}
-        <div className="flex h-16 items-center justify-between px-5 border-b border-slate-800/80 bg-slate-950/90">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/30 to-purple-500/30 border border-cyan-500/50 shadow-neon-cyan/40">
-              <ShieldCheck className="h-5 w-5 text-cyan-300" />
-              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400" />
-              </span>
+        <div className="flex h-16 items-center justify-between border-b border-slate-800 px-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-950 border border-cyan-500/40 shadow-neon-cyan/20">
+              <ShieldCheck className="h-5 w-5 text-cyan-400" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-display font-extrabold text-base tracking-wider bg-gradient-to-r from-cyan-300 via-sky-200 to-purple-300 bg-clip-text text-transparent">
+                <span className="font-mono text-sm font-bold tracking-wider text-slate-100">
                   {productConfig.brand.name}
                 </span>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                  v3.5
+                <span className="text-[10px] rounded bg-cyan-950 border border-cyan-500/40 px-1 py-0.2 text-cyan-400 font-mono">
+                  {productConfig.brand.code}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono tracking-tight">
-                AI Defense Platform
+              <p className="text-[10px] text-slate-400 font-mono">
+                {productConfig.brand.tagline}
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-slate-100 lg:hidden"
-            aria-label="Close Sidebar"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-slate-100 lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Live Status Pill Bar */}
-        <div className="px-4 py-2 border-b border-slate-800/60 bg-gradient-to-r from-slate-900/90 to-slate-950/90">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="font-mono text-[11px] text-slate-300 font-medium">SOC Engine Online</span>
-            </div>
-            <span className="font-mono text-[10px] text-purple-300 bg-purple-950/60 border border-purple-500/40 px-1.5 py-0.5 rounded">
-              PostgREST
-            </span>
+        {/* Navigation Items */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          <div className="px-3 pb-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-slate-400">
+            SOC Navigation
           </div>
-        </div>
 
-        {/* Navigation Links */}
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scrollbar-none">
           {navItems.map((item) => (
             <NavLink
               key={item.href}
               to={item.href}
-              onClick={() => onClose()}
+              onClick={onClose}
               className={({ isActive }) =>
                 cn(
-                  'group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 border',
+                  'flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150 border border-transparent',
+                  item.color,
                   isActive
-                    ? 'border-cyan-500/50 bg-gradient-to-r from-cyan-950/60 via-slate-900/90 to-purple-950/40 text-cyan-200 shadow-neon-cyan/20'
-                    : `border-transparent text-slate-400 hover:text-slate-200 ${item.color}`
+                    ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30 shadow-neon-cyan/10 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
                 )
               }
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-1 rounded-lg bg-slate-900/80 border border-slate-800 group-hover:border-slate-700 transition-colors shrink-0">
-                  {item.icon}
-                </div>
-                <span className="truncate">{item.name}</span>
+              <div className="flex items-center gap-3">
+                {item.icon}
+                <span>{item.name}</span>
               </div>
 
               {item.badge && (
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[9px] font-mono font-bold tracking-wide',
+                    item.badge === 'CRITICAL' || item.badge === 'GMAIL / PDF'
+                      ? 'bg-red-950 text-red-400 border border-red-500/40 animate-pulse'
+                      : item.badge === 'QUARANTINE'
+                      ? 'bg-rose-950 text-rose-300 border border-rose-500/40'
+                      : item.badge === 'ARCHIVE'
+                      ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                      : item.badge.includes('VOICE')
+                      ? 'bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-500/40'
+                      : 'bg-cyan-950 text-cyan-400 border border-cyan-500/30'
+                  )}
+                >
                   {item.badge}
                 </span>
               )}
             </NavLink>
           ))}
-        </nav>
+        </div>
 
-        {/* Analyst Footer */}
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950/90">
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center font-mono font-bold text-xs text-white shadow-neon-purple/30">
-              SOC
+        {/* User Status / System Indicator Footer */}
+        <div className="border-t border-slate-800 p-3 bg-slate-950/60 font-mono">
+          <div className="flex items-center gap-2.5 rounded-lg bg-slate-900/90 border border-slate-800/90 p-2">
+            <div className="relative">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-cyan-400 font-bold text-xs">
+                {productConfig.brand.analyst.initials}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-slate-950" />
             </div>
-            <div className="min-w-0">
+            <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-slate-200 truncate">
                 {productConfig.brand.analyst.name}
               </p>
-              <p className="text-[10px] text-cyan-400 font-mono truncate">
+              <p className="text-[10px] text-cyan-400 truncate">
                 {productConfig.brand.analyst.role}
               </p>
             </div>
