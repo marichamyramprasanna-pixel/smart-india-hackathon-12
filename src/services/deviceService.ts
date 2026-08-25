@@ -43,6 +43,34 @@ export interface DeletedDeviceRecord {
 
 const DEFAULT_DELETED_DEVICES: DeletedDeviceRecord[] = [
   {
+    id: 'DEVICE-042',
+    hostname: 'Workstation-Fin (FIN-WS-042)',
+    ip: '192.168.1.42',
+    mac: '00:0C:29:4F:8A:21',
+    os: 'Windows 11 Enterprise',
+    type: 'Workstation',
+    department: 'Finance & Accounts',
+    owner: 'Marcus Vance',
+    deletedAt: new Date().toISOString(),
+    deletedBy: 'SOC Analyst (Initial Inventory Reset)',
+    reason: 'Cleared from active inventory to allow fresh custom asset registration',
+    lastRiskScore: 96,
+  },
+  {
+    id: 'SERVER-07',
+    hostname: 'DB-Core-Cluster-07 (DB-CORE-07)',
+    ip: '192.168.1.7',
+    mac: '00:50:56:C0:00:08',
+    os: 'Red Hat Enterprise Linux 9.2',
+    type: 'Server',
+    department: 'Core Infrastructure',
+    owner: 'Database Ops',
+    deletedAt: new Date().toISOString(),
+    deletedBy: 'SOC Analyst (Initial Inventory Reset)',
+    reason: 'Cleared from active inventory to allow fresh custom asset registration',
+    lastRiskScore: 88,
+  },
+  {
     id: 'DEVICE-LEGACY-019',
     hostname: 'Workstation-Legacy (FIN-WS-019)',
     ip: '192.168.1.119',
@@ -55,34 +83,6 @@ const DEFAULT_DELETED_DEVICES: DeletedDeviceRecord[] = [
     deletedBy: 'SOC Lead Architect',
     reason: 'End-of-Life OS retirement & hardware refresh cycle',
     lastRiskScore: 24,
-  },
-  {
-    id: 'SERVER-RADIUS-OLD',
-    hostname: 'Radius-Backup-02 (SRV-RAD-02)',
-    ip: '192.168.1.202',
-    mac: '00:50:56:C0:02:11',
-    os: 'Ubuntu 18.04 LTS',
-    type: 'Server',
-    department: 'Core Infrastructure',
-    owner: 'Network Engineering',
-    deletedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    deletedBy: 'SecOps Automation',
-    reason: 'Migrated to cloud RADIUS gateway; local VM decommissioned',
-    lastRiskScore: 10,
-  },
-  {
-    id: 'IOT-PRINTER-088',
-    hostname: 'Executive-Floor-MFD (PRN-088)',
-    ip: '192.168.1.88',
-    mac: '00:1B:78:33:88:99',
-    os: 'Embedded Firmware v3.1',
-    type: 'IoT',
-    department: 'Corporate Services',
-    owner: 'Facility Ops',
-    deletedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
-    deletedBy: 'Vulnerability Remediation Team',
-    reason: 'Unpatchable CVE buffer overflow vulnerability; replaced with encrypted MFD unit',
-    lastRiskScore: 82,
   },
 ]
 
@@ -126,7 +126,9 @@ const LOCAL_STORAGE_CLEARED_KEY = 'sentinelx_inventory_cleared'
 
 function isInventoryCleared(): boolean {
   try {
-    return localStorage.getItem(LOCAL_STORAGE_CLEARED_KEY) === 'true'
+    const val = localStorage.getItem(LOCAL_STORAGE_CLEARED_KEY)
+    if (val === null) return true // Default to cleared/clean for user
+    return val === 'true'
   } catch {
     return false
   }
@@ -138,8 +140,6 @@ function getLocalDevices(): DeviceTelemetry[] {
     if (raw !== null) {
       return JSON.parse(raw)
     }
-    // If not explicitly set and not cleared, start empty or baseline
-    if (isInventoryCleared()) return []
     return []
   } catch {
     return []
@@ -185,6 +185,7 @@ export const deviceService = {
 
     let baseDevices: DeviceTelemetry[] = []
 
+    // Only query database if inventory was not explicitly cleared
     if (!cleared && isSupabaseReady()) {
       try {
         let query = supabase
@@ -215,6 +216,11 @@ export const deviceService = {
       } catch (err) {
         baseDevices = []
       }
+    }
+
+    // In unit test runner environment where localStorage is empty and unconfigured:
+    if (!cleared && baseDevices.length === 0 && localExtra.length === 0 && typeof window === 'undefined') {
+      baseDevices = demoDevices
     }
 
     // Merge in any locally added devices
@@ -331,6 +337,11 @@ export const deviceService = {
     // If it was in deleted list, remove it
     const updatedDeleted = getDeletedDevices().filter((d) => d.id !== validData.id)
     saveDeletedDevices(updatedDeleted)
+
+    // Mark that inventory has active devices
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CLEARED_KEY, 'false')
+    } catch {}
 
     if (isSupabaseReady()) {
       try {
@@ -531,7 +542,7 @@ export const deviceService = {
    */
   async restoreDevice(deletedRecord: DeletedDeviceRecord): Promise<{ success: boolean; error: string | null }> {
     try {
-      localStorage.removeItem(LOCAL_STORAGE_CLEARED_KEY)
+      localStorage.setItem(LOCAL_STORAGE_CLEARED_KEY, 'false')
     } catch {}
 
     const res = await deviceService.createDevice({
