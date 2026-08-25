@@ -44,8 +44,11 @@ export const BlockedDevicesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'DEVICES' | 'IPS'>('ALL')
 
-  // Manual Quarantine Modal
+  // Manual Containment / Firewall Drop Modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false)
+  const [manualActionType, setManualActionType] = useState<'BLOCK_HACKER_IP' | 'QUARANTINE_DEVICE'>('BLOCK_HACKER_IP')
+  const [hackerIp, setHackerIp] = useState('')
+  const [hackerReason, setHackerReason] = useState('Adversary IP detected attempting unauthorized database infiltration')
   const [manualHost, setManualHost] = useState('')
   const [manualId, setManualId] = useState('')
   const [manualReason, setManualReason] = useState('Manual SOC Analyst Incident Response containment')
@@ -57,6 +60,26 @@ export const BlockedDevicesPage: React.FC = () => {
   const [onboardDeviceType, setOnboardDeviceType] = useState<'External' | 'Server' | 'Workstation' | 'Router'>('External')
   const [isProcessingOnboard, setIsProcessingOnboard] = useState(false)
   const [successToast, setSuccessToast] = useState<string | null>(null)
+
+  const handleManualActionSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (manualActionType === 'BLOCK_HACKER_IP') {
+      if (!hackerIp.trim()) return
+      blockIp(hackerIp.trim(), hackerReason)
+      setIsManualModalOpen(false)
+      setSuccessToast(`🛡️ PERIMETER FIREWALL: Blocked Hacker IP ${hackerIp.trim()}. Inbound/outbound traffic null-routed!`)
+      setHackerIp('')
+      setTimeout(() => setSuccessToast(null), 4000)
+    } else {
+      if (!manualId.trim()) return
+      isolateDevice(manualId.trim(), manualHost.trim() || manualId.trim(), manualReason)
+      setIsManualModalOpen(false)
+      setManualId('')
+      setManualHost('')
+      setSuccessToast(`802.1X Quarantine enforced on internal host ${manualId.trim()}.`)
+      setTimeout(() => setSuccessToast(null), 3000)
+    }
+  }
 
   const isolatedList = Object.values(isolatedDevices)
   const blockedIpList = Object.values(blockedIps)
@@ -598,60 +621,135 @@ export const BlockedDevicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal 2: Manual Quarantine Endpoint */}
+      {/* Modal 2: Manual Containment & Hacker IP Firewall Drop */}
       {isManualModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-md p-6 rounded-2xl border border-red-500/50 bg-slate-950 shadow-2xl space-y-4 font-mono text-xs">
+          <div className="w-full max-w-lg p-6 rounded-2xl border border-red-500/50 bg-slate-950 shadow-2xl space-y-4 font-mono text-xs">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <Lock className="h-4 w-4 text-red-400" />
-                <span>Manual 802.1X Host Quarantine</span>
-              </h3>
+              <div className="flex items-center gap-2">
+                <ShieldBan className="h-5 w-5 text-red-400" />
+                <h3 className="text-sm font-bold text-slate-100">
+                  {manualActionType === 'BLOCK_HACKER_IP' ? 'Block Hacker / Attacker IP Address' : '802.1X Internal Host Quarantine'}
+                </h3>
+              </div>
               <button onClick={() => setIsManualModalOpen(false)} className="p-1 rounded text-slate-400 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleManualQuarantine} className="space-y-3">
-              <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Device ID *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. DEVICE-088 or SERVER-04"
-                  value={manualId}
-                  onChange={(e) => setManualId(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-red-400 focus:outline-none"
-                />
-              </div>
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setManualActionType('BLOCK_HACKER_IP')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  manualActionType === 'BLOCK_HACKER_IP'
+                    ? 'bg-red-600 text-white shadow-neon-red/40'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <ShieldBan className="h-3.5 w-3.5" />
+                <span>Block Hacker IP</span>
+              </button>
 
-              <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Hostname / Description</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Workstation-HR (HR-WS-088)"
-                  value={manualHost}
-                  onChange={(e) => setManualHost(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-red-400 focus:outline-none"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setManualActionType('QUARANTINE_DEVICE')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  manualActionType === 'QUARANTINE_DEVICE'
+                    ? 'bg-rose-700 text-white shadow-neon-rose/40'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Lock className="h-3.5 w-3.5" />
+                <span>Quarantine Company Host</span>
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Quarantine Justification</label>
-                <textarea
-                  value={manualReason}
-                  onChange={(e) => setManualReason(e.target.value)}
-                  rows={2}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-red-400 focus:outline-none"
-                />
-              </div>
+            <form onSubmit={handleManualActionSubmit} className="space-y-4 pt-1">
+              {manualActionType === 'BLOCK_HACKER_IP' ? (
+                <>
+                  <div className="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-[11px] text-red-300">
+                    Creates an immediate <strong>eBPF / Firewall DROP rule</strong> to null-route all network connections from this adversary IP to your database and company infrastructure.
+                  </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                      Hacker / Adversary IPv4 Address *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 185.220.101.5 or 194.26.29.114"
+                      value={hackerIp}
+                      onChange={(e) => setHackerIp(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-red-400 font-mono font-bold focus:border-red-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">Attack Classification / Threat Reason</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Database SQLi probe / Cobalt Strike C2 Beacon / Brute Force"
+                      value={hackerReason}
+                      onChange={(e) => setHackerReason(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-red-400 focus:outline-none"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30 text-[11px] text-rose-300">
+                    Enforces <strong>802.1X Port Isolation</strong> to place an internal compromised company workstation into VLAN-999 jail.
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">Internal Device ID *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. DEV-001 or DEV-SRV-01"
+                      value={manualId}
+                      onChange={(e) => setManualId(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-rose-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">Hostname / Description</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Database-Primary-Server"
+                      value={manualHost}
+                      onChange={(e) => setManualHost(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-rose-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">Quarantine Justification</label>
+                    <textarea
+                      value={manualReason}
+                      onChange={(e) => setManualReason(e.target.value)}
+                      rows={2}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-rose-400 focus:outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsManualModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="destructive" size="sm">
-                  Enforce Quarantine
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-500 font-bold shadow-neon-red/40 px-4"
+                >
+                  {manualActionType === 'BLOCK_HACKER_IP' ? 'Null-Route Hacker IP' : 'Enforce 802.1X Quarantine'}
                 </Button>
               </div>
             </form>
