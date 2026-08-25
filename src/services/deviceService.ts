@@ -83,17 +83,16 @@ const LOCAL_STORAGE_CLEARED_KEY = 'sentinelx_inventory_cleared'
 // Resilient In-Memory store
 let inMemoryDevices: DeviceTelemetry[] = []
 let inMemoryDeleted: DeletedDeviceRecord[] = []
+let inMemoryCleared = true
 
 const LEGACY_IDS = new Set(['DEVICE-042', 'SERVER-07', 'FIN-WS-042', 'DEVICE-118', 'DEVICE-LEGACY-019', 'DB-CORE-07'])
 
-function isInventoryCleared(): boolean {
+export function isInventoryCleared(): boolean {
   try {
     const val = localStorage.getItem(LOCAL_STORAGE_CLEARED_KEY)
-    if (val === null) return true // Default to cleared/clean for user
-    return val === 'true'
-  } catch {
-    return false
-  }
+    if (val !== null) return val === 'true'
+  } catch {}
+  return inMemoryCleared
 }
 
 function getLocalDevices(): DeviceTelemetry[] {
@@ -460,9 +459,9 @@ export const deviceService = {
    * DELETE ALL: Remove all active devices and reset inventory cleanly
    */
   async deleteAllDevices(): Promise<{ success: boolean; count: number }> {
-    const { data: allActive } = await deviceService.getDevices()
-    const count = allActive.length
-
+    inMemoryCleared = true
+    inMemoryDevices = []
+    inMemoryDeleted = []
     saveLocalDevices([])
     saveDeletedDevices([])
     try {
@@ -477,7 +476,7 @@ export const deviceService = {
       } catch (err) {}
     }
 
-    return { success: true, count }
+    return { success: true, count: 0 }
   },
 
   /**
