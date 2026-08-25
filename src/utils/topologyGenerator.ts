@@ -30,97 +30,79 @@ function mapDeviceStatusToNodeStatus(status: string, isIsolated: boolean = false
 }
 
 /**
- * Dynamically builds 3D topology nodes and packet links by merging:
- * 1. Real active devices
- * 2. 802.1X Quarantined & Isolated devices
- * 3. Perimeter Blocked Adversary IPs
- * 4. Decommissioned / Deleted Tombstone devices
- * 5. Fixed infrastructure backbone (Firewall, Core Router, Cloud VPC)
+ * Dynamically builds 3D topology nodes and packet links.
+ * When devices.length === 0, the topology is BLANK (0 nodes, 0 links).
+ * When devices are added, it builds the Core Router hub and connects all added devices.
  */
 export function generateDynamic3DTopology(
   devices: DeviceTelemetry[] = [],
   isolatedMap: Record<string, { deviceId: string; hostname?: string; reason?: string }> = {},
   blockedIpsMap: Record<string, { ip: string; ruleId?: string; reason?: string }> = {},
   deletedDevices: DeletedDeviceRecord[] = [],
-  showDecommissioned: boolean = true,
-  baseNodes: Network3DNode[] = mock3DNodes,
-  baseLinks: Network3DLink[] = mock3DLinks
+  showDecommissioned: boolean = false
 ): { nodes: Network3DNode[]; links: Network3DLink[] } {
-  // Fixed infrastructure nodes that always anchor the 3D topology
-  const fixedInfraNodeIds = new Set([
-    'node-internet',
-    'node-firewall-01',
-    'node-core-router',
-    'node-cloud-eks',
-  ])
+  // If there are no active devices added yet, return completely blank topology
+  if (devices.length === 0) {
+    return { nodes: [], links: [] }
+  }
 
-  const infraNodes = baseNodes.filter((n) => fixedInfraNodeIds.has(n.id))
-  const knownBaseNodeMap = new Map<string, Network3DNode>()
-  baseNodes.forEach((n) => knownBaseNodeMap.set(n.id, n))
+  // 1. Anchor Core Distribution Switch at [0, 0, 0]
+  const coreRouterNode: Network3DNode = {
+    id: 'node-core-router',
+    label: 'Core Distribution Switch (L3-CORE-01)',
+    type: 'router',
+    ip: '192.168.1.1',
+    status: 'HEALTHY',
+    position: [0, 0, 0],
+    riskScore: 0,
+    compromiseProbability: 0,
+    activeConnectionsCount: devices.length * 4,
+    bandwidthMbps: 1000,
+    anomalies: [],
+    zone: 'Core',
+  }
 
-  const finalNodes: Network3DNode[] = [...infraNodes]
-  const finalLinks: Network3DLink[] = [...baseLinks.filter((l) => fixedInfraNodeIds.has(l.source) && fixedInfraNodeIds.has(l.target))]
-  const existingLinkKeys = new Set(finalLinks.map((l) => `${l.source}->${l.target}`))
+  // 2. Add Perimeter Firewall at [-5.5, 0, 0]
+  const firewallNode: Network3DNode = {
+    id: 'node-firewall-01',
+    label: 'Next-Gen Perimeter Firewall (NGFW-01)',
+    type: 'firewall',
+    ip: '192.168.1.254',
+    status: 'HEALTHY',
+    position: [-5.5, 0.5, 0],
+    riskScore: 5,
+    compromiseProbability: 2,
+    activeConnectionsCount: 45,
+    bandwidthMbps: 850,
+    anomalies: [],
+    zone: 'DMZ',
+  }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // 1. BLOCKED ADVERSARY IP NODES (Perimeter Firewall Drop Points)
-  // ══════════════════════════════════════════════════════════════════════
-  const blockedIpsList = Object.values(blockedIpsMap)
-  const defaultBlocked = [
-    { ip: '185.220.101.5', ruleId: 'FW-DROP-9012', reason: 'Cobalt Strike C2 / Tor Exit' },
-    { ip: '194.26.29.114', ruleId: 'FW-DROP-9014', reason: 'LockBit 3.0 Drop Point' },
+  const finalNodes: Network3DNode[] = [coreRouterNode, firewallNode]
+  const finalLinks: Network3DLink[] = [
+    {
+      id: 'link-fw-core',
+      source: 'node-firewall-01',
+      target: 'node-core-router',
+      status: 'normal',
+      trafficSpeed: 1.0,
+      bandwidthKbps: 2400,
+      protocol: 'HTTPS/443',
+      isEncrypted: true,
+    },
   ]
-  const allBlockedIps = blockedIpsList.length > 0 ? blockedIpsList : defaultBlocked
+  const existingLinkKeys = new Set(['node-firewall-01->node-core-router'])
 
-  allBlockedIps.forEach((rec, idx) => {
-    const ipNodeId = `node-blocked-ip-${idx + 1}`
-    const angle = (idx / Math.max(allBlockedIps.length, 1)) * 1.2 - 0.6
-    const posX = parseFloat((-9.5 - idx * 1.5).toFixed(2))
-    const posY = parseFloat((Math.sin(angle) * 3.2 + 2.0).toFixed(2))
-    const posZ = parseFloat((Math.cos(angle) * 3.5 - 2.0).toFixed(2))
-
-    finalNodes.push({
-      id: ipNodeId,
-      label: `BLOCKED IP: ${rec.ip}`,
-      type: 'c2_server',
-      ip: rec.ip,
-      status: 'BLOCKED_PERIMETER',
-      position: [posX, posY, posZ],
-      riskScore: 98,
-      compromiseProbability: 95,
-      activeConnectionsCount: 0,
-      bandwidthMbps: 0,
-      anomalies: [rec.reason || 'Perimeter firewall ACL drop active'],
-      zone: 'External',
-      quarantineReason: rec.reason || 'Perimeter Null-Route',
-    })
-
-    // Add severed link to Firewall with status 'blocked'
-    finalLinks.push({
-      id: `link-${ipNodeId}-fw`,
-      source: ipNodeId,
-      target: 'node-firewall-01',
-      status: 'blocked',
-      trafficSpeed: 0,
-      bandwidthKbps: 0,
-      protocol: 'DROPPED',
-      isEncrypted: false,
-    })
-  })
-
-  // ══════════════════════════════════════════════════════════════════════
-  // 2. ACTIVE & ISOLATED INVENTORY DEVICES
-  // ══════════════════════════════════════════════════════════════════════
+  // 3. Connect all present added devices dynamically in orbital space
   devices.forEach((dev, index) => {
     const isIsolated = !!isolatedMap[dev.id] || dev.status === 'ISOLATED' || dev.isolationStatus?.isIsolated
     const nodeStatus = mapDeviceStatusToNodeStatus(dev.status, isIsolated)
 
-    // Calculate dynamic 3D orbital position around Core Switch [0, 0, 0]
     const angle = (index / Math.max(devices.length, 1)) * Math.PI * 2 + 0.4
-    const radius = 6.4 + (index % 3) * 1.4
+    const radius = 5.8 + (index % 3) * 1.2
     const posX = parseFloat((Math.cos(angle) * radius).toFixed(2))
     const posZ = parseFloat((Math.sin(angle) * radius).toFixed(2))
-    const posY = parseFloat((((index % 4) - 1.5) * 1.2).toFixed(2))
+    const posY = parseFloat((((index % 4) - 1.5) * 1.1).toFixed(2))
 
     const newNode: Network3DNode = {
       id: dev.id,
@@ -143,7 +125,6 @@ export function generateDynamic3DTopology(
 
     finalNodes.push(newNode)
 
-    // Link to Core Router
     const linkKey = `${dev.id}->node-core-router`
     if (!existingLinkKeys.has(linkKey)) {
       const isThreat = dev.status === 'COMPROMISED' || dev.status === 'SUSPICIOUS'
@@ -167,20 +148,56 @@ export function generateDynamic3DTopology(
     }
   })
 
-  // ══════════════════════════════════════════════════════════════════════
-  // 3. DECOMMISSIONED / DELETED TOMBSTONE DEVICES
-  // ══════════════════════════════════════════════════════════════════════
+  // 4. If any adversary IPs are blocked, attach outside firewall
+  const blockedIpsList = Object.values(blockedIpsMap)
+  if (blockedIpsList.length > 0) {
+    blockedIpsList.forEach((rec, idx) => {
+      const ipNodeId = `node-blocked-ip-${idx + 1}`
+      const posX = parseFloat((-9.0 - idx * 1.5).toFixed(2))
+      const posY = parseFloat((idx * 1.2).toFixed(2))
+      const posZ = parseFloat((idx * 1.4 - 1.0).toFixed(2))
+
+      finalNodes.push({
+        id: ipNodeId,
+        label: `BLOCKED IP: ${rec.ip}`,
+        type: 'c2_server',
+        ip: rec.ip,
+        status: 'BLOCKED_PERIMETER',
+        position: [posX, posY, posZ],
+        riskScore: 98,
+        compromiseProbability: 95,
+        activeConnectionsCount: 0,
+        bandwidthMbps: 0,
+        anomalies: [rec.reason || 'Firewall null-route active'],
+        zone: 'External',
+        quarantineReason: rec.reason || 'Perimeter Null-Route',
+      })
+
+      finalLinks.push({
+        id: `link-${ipNodeId}-fw`,
+        source: ipNodeId,
+        target: 'node-firewall-01',
+        status: 'blocked',
+        trafficSpeed: 0,
+        bandwidthKbps: 0,
+        protocol: 'DROPPED',
+        isEncrypted: false,
+      })
+    })
+  }
+
+  // 5. If user toggled showDecommissioned and has deleted devices
   if (showDecommissioned && deletedDevices.length > 0) {
     deletedDevices.forEach((del, idx) => {
       const angle = (idx / Math.max(deletedDevices.length, 1)) * Math.PI * 2 + 1.2
-      const radius = 10.5 // Outer Archival Orbit
+      const radius = 9.8
       const posX = parseFloat((Math.cos(angle) * radius).toFixed(2))
       const posZ = parseFloat((Math.sin(angle) * radius).toFixed(2))
-      const posY = parseFloat((-3.5 + idx * 0.8).toFixed(2))
+      const posY = parseFloat((-3.2 + idx * 0.8).toFixed(2))
 
-      const tombNode: Network3DNode = {
+      finalNodes.push({
         id: del.id,
-        label: `${del.hostname} [TOMBSTONE ARCHIVE]`,
+        label: `${del.hostname} [TOMBSTONE]`,
         type: 'decommissioned',
         ip: del.ip,
         status: 'DECOMMISSIONED',
@@ -193,11 +210,8 @@ export function generateDynamic3DTopology(
         zone: 'Archival Vault',
         isDecommissioned: true,
         decommissionReason: del.reason,
-      }
+      })
 
-      finalNodes.push(tombNode)
-
-      // Add faint tombstone reference link
       finalLinks.push({
         id: `link-tomb-${del.id}`,
         source: del.id,

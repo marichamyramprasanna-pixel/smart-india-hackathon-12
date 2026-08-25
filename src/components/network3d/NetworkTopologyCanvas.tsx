@@ -1,6 +1,7 @@
 import React, { useState, useRef, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stars, Grid } from '@react-three/drei'
+import { useNavigate } from 'react-router-dom'
 import {
   RotateCcw,
   Layers,
@@ -16,6 +17,7 @@ import {
   Sliders,
   Maximize2,
   Sparkles,
+  Plus,
 } from 'lucide-react'
 import { Network3DNode, Network3DLink } from '../../types/network'
 import { NetworkNodes } from './NetworkNodes'
@@ -38,6 +40,7 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   links,
   height = 'h-[620px]',
 }) => {
+  const navigate = useNavigate()
   const { currentStage } = useDemoScenario()
   const controlsRef = useRef<any>(null)
 
@@ -46,7 +49,6 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [autoRotate, setAutoRotate] = useState(true)
-  const [packetSpeed, setPacketSpeed] = useState<number>(1)
   const [cameraPreset, setCameraPreset] = useState<'overview' | 'threat' | 'top'>('overview')
 
   // Sync node statuses dynamically with DemoScenario state
@@ -87,7 +89,7 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
     if (!matchesSearch) return false
 
     if (filterType === 'threats')
-      return node.status === 'COMPROMISED' || node.status === 'SUSPICIOUS'
+      return node.status === 'COMPROMISED' || node.status === 'SUSPICIOUS' || node.status === 'ISOLATED'
     if (filterType === 'endpoints')
       return node.type === 'workstation' || node.type === 'laptop'
     if (filterType === 'infrastructure')
@@ -103,14 +105,10 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
 
     if (preset === 'overview') {
       controlsRef.current.object.position.set(0, 10, 24)
-      controlsRef.current.target.set(0, 0, 0)
     } else if (preset === 'threat') {
-      // Focus on DEVICE-042 position
-      controlsRef.current.object.position.set(4, 5, 10)
-      controlsRef.current.target.set(2, 0, 0)
+      controlsRef.current.object.position.set(4, 5, 12)
     } else if (preset === 'top') {
-      controlsRef.current.object.position.set(0, 32, 0)
-      controlsRef.current.target.set(0, 0, 0)
+      controlsRef.current.object.position.set(0, 26, 0.1)
     }
     controlsRef.current.update()
   }
@@ -233,6 +231,32 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
         </div>
       </div>
 
+      {/* Standby State Overlay if No Nodes */}
+      {nodes.length === 0 && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none p-6">
+          <div className="max-w-md p-6 rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/90 backdrop-blur-xl shadow-2xl text-center space-y-4 font-mono pointer-events-auto">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 border border-cyan-500/50 text-cyan-300 mx-auto shadow-neon-cyan/30">
+              <Sparkles className="h-7 w-7 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-100">3D TOPOLOGY CANVAS: STANDBY</h3>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Zero active endpoints in inventory. The 3D canvas is clean and ready. Register your first device to construct the 3D network nodes and packet streams!
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/devices')}
+              className="text-xs font-semibold gap-1.5 shadow-neon-cyan/40"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Register First Endpoint</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* 3D WebGL Canvas or 2D Vector Fallback */}
       <div className="flex-1 w-full h-full relative cursor-grab active:cursor-grabbing">
         {viewMode === '3d' ? (
@@ -298,12 +322,11 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
                 ref={controlsRef}
                 enablePan={true}
                 enableZoom={true}
-                enableRotate={true}
-                autoRotate={autoRotate}
-                autoRotateSpeed={1.0}
                 maxDistance={50}
-                minDistance={4}
-                dampingFactor={0.06}
+                minDistance={5}
+                autoRotate={autoRotate}
+                autoRotateSpeed={0.8}
+                dampingFactor={0.05}
               />
             </Canvas>
           </Suspense>
@@ -311,36 +334,16 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
           <Network2DFallback
             nodes={filteredNodes}
             links={links}
-            selectedNodeId={selectedNode?.id || null}
             onSelectNode={(node) => setSelectedNode(node)}
           />
         )}
       </div>
 
-      {/* Floating Status & Interactive Legend Bar */}
-      <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-300 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800/80 shadow-xl backdrop-blur-md">
-          <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-          <span>
-            WebGL Active • Orbit: Drag • Zoom: Scroll • Triage: Click any 3D Node
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800/80 text-[10px] font-mono backdrop-blur-md shadow-xl">
-          <span className="flex items-center gap-1 text-cyan-400">
-            <span className="h-2 w-2 rounded-full bg-cyan-400" /> Healthy
-          </span>
-          <span className="flex items-center gap-1 text-amber-400">
-            <span className="h-2 w-2 rounded-full bg-amber-400" /> Suspicious
-          </span>
-          <span className="flex items-center gap-1 text-red-400 font-bold">
-            <span className="h-2 w-2 rounded-full bg-red-400 animate-ping" /> Compromised (Patient Zero)
-          </span>
-        </div>
-      </div>
-
-      {/* Slide-out Node Investigation Drawer */}
-      <NodeDetailsDrawer node={selectedNode} onClose={() => setSelectedNode(null)} />
+      {/* Forensic Drawer for Selected 3D Node */}
+      <NodeDetailsDrawer
+        node={selectedNode}
+        onClose={() => setSelectedNode(null)}
+      />
     </div>
   )
 }
