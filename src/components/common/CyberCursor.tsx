@@ -24,8 +24,8 @@ export const CyberCursor: React.FC = () => {
       mouseY = e.clientY
       if (!isVisible) {
         isVisible = true
-        if (dotRef.current) dotRef.current.style.opacity = '1'
-        if (ringRef.current) ringRef.current.style.opacity = '1'
+        if (dotRef.current) dotRef.current.style.opacity = '0.6'
+        if (ringRef.current) ringRef.current.style.opacity = '0.3'
       }
 
       // Check if hovering over clickable targets
@@ -54,40 +54,38 @@ export const CyberCursor: React.FC = () => {
 
     const onMouseEnter = () => {
       isVisible = true
-      if (dotRef.current) dotRef.current.style.opacity = '1'
-      if (ringRef.current) ringRef.current.style.opacity = '1'
+      if (dotRef.current) dotRef.current.style.opacity = '0.6'
+      if (ringRef.current) ringRef.current.style.opacity = '0.3'
     }
 
-    // High-performance GPU render loop (Zero React re-renders)
+    // High-performance GPU render loop with reduced subtlety
     const renderLoop = () => {
       // Spring interpolation for smooth trailing
-      ringX += (mouseX - ringX) * 0.2
-      ringY += (mouseY - ringY) * 0.2
+      ringX += (mouseX - ringX) * 0.25
+      ringY += (mouseY - ringY) * 0.25
 
       if (dotRef.current) {
         dotRef.current.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0) translate(-50%, -50%) scale(${
-          isClicking ? 1.6 : isHovered ? 1.3 : 1
+          isClicking ? 1.2 : isHovered ? 1.15 : 1
         })`
         dotRef.current.style.backgroundColor = isClicking ? '#EF4444' : isHovered ? '#00F0FF' : '#38BDF8'
-        dotRef.current.style.boxShadow = isClicking
-          ? '0 0 10px 2px rgba(239, 68, 68, 0.9)'
-          : isHovered
-          ? '0 0 12px 3px rgba(0, 240, 255, 0.9)'
-          : '0 0 8px 2px rgba(56, 189, 248, 0.6)'
+        dotRef.current.style.boxShadow = isHovered
+          ? '0 0 6px 1px rgba(0, 240, 255, 0.4)'
+          : '0 0 3px 0.5px rgba(56, 189, 248, 0.3)'
       }
 
       if (ringRef.current) {
-        const ringScale = isClicking ? 1.4 : isHovered ? 1.35 : 1
+        const ringScale = isClicking ? 1.15 : isHovered ? 1.2 : 1
         ringRef.current.style.transform = `translate3d(${ringX}px, ${ringY}px, 0) translate(-50%, -50%) scale(${ringScale})`
         ringRef.current.style.borderColor = isClicking
-          ? 'rgba(239, 68, 68, 0.85)'
+          ? 'rgba(239, 68, 68, 0.4)'
           : isHovered
-          ? 'rgba(0, 240, 255, 0.85)'
-          : 'rgba(56, 189, 248, 0.35)'
+          ? 'rgba(0, 240, 255, 0.35)'
+          : 'rgba(56, 189, 248, 0.15)'
         ringRef.current.style.backgroundColor = isClicking
-          ? 'rgba(239, 68, 68, 0.12)'
+          ? 'rgba(239, 68, 68, 0.04)'
           : isHovered
-          ? 'rgba(0, 240, 255, 0.1)'
+          ? 'rgba(0, 240, 255, 0.03)'
           : 'transparent'
       }
 
@@ -114,22 +112,22 @@ export const CyberCursor: React.FC = () => {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden select-none" aria-hidden="true">
-      {/* 1. Precision Center Laser Dot */}
+      {/* 1. Subtle Precision Micro-Dot */}
       <div
         ref={dotRef}
-        className="pointer-events-none fixed left-0 top-0 h-1.5 w-1.5 rounded-full opacity-0 will-change-transform"
+        className="pointer-events-none fixed left-0 top-0 h-1 w-1 rounded-full opacity-0 will-change-transform"
         style={{
           transition: 'opacity 0.2s ease, background-color 0.15s ease, box-shadow 0.15s ease',
         }}
       />
 
-      {/* 2. Fluid Cyber Reticle Aura Ring */}
+      {/* 2. Soft Faint Micro-Aura Ring */}
       <div
         ref={ringRef}
-        className="pointer-events-none fixed left-0 top-0 h-6 w-6 rounded-full border border-cyan-400/40 opacity-0 will-change-transform"
+        className="pointer-events-none fixed left-0 top-0 h-4 w-4 rounded-full border border-cyan-400/20 opacity-0 will-change-transform"
         style={{
           transition: 'opacity 0.2s ease, border-color 0.15s ease, background-color 0.15s ease',
-          boxShadow: '0 0 12px -2px rgba(0, 240, 255, 0.35)',
+          boxShadow: '0 0 6px -1px rgba(0, 240, 255, 0.15)',
         }}
       />
     </div>
