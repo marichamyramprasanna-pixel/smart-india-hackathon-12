@@ -15,8 +15,8 @@ export function useDevices(filters?: {
       const res = await deviceService.getDevices(filters)
       return res.data
     },
-    staleTime: 1000 * 30,        // treat data fresh for 30s
-    refetchInterval: 1000 * 30,  // auto-refresh every 30s in background
+    staleTime: 1000 * 10,        // treat data fresh for 10s
+    refetchInterval: 1000 * 15,  // auto-refresh every 15s in background
     refetchIntervalInBackground: false,
   })
 
@@ -74,6 +74,16 @@ export function useDevices(filters?: {
     },
   })
 
+  const deleteAllDevicesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await deviceService.deleteAllDevices()
+      return res.count
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    },
+  })
+
   return {
     devices: devicesQuery.data || [],
     isLoading: devicesQuery.isLoading,
@@ -88,5 +98,7 @@ export function useDevices(filters?: {
     isIsolating: isolateDeviceMutation.isPending,
     deleteDevice: deleteDeviceMutation.mutateAsync,
     isDeleting: deleteDeviceMutation.isPending,
+    deleteAllDevices: deleteAllDevicesMutation.mutateAsync,
+    isDeletingAll: deleteAllDevicesMutation.isPending,
   }
 }

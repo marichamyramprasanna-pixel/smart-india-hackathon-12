@@ -17,6 +17,10 @@ import {
   Trash2,
   Download,
   Radar,
+  Archive,
+  CheckCircle2,
+  X,
+  Sparkles,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
 import { Badge } from '../components/common/Badge'
@@ -37,8 +41,10 @@ export const DevicesPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isCollectorModalOpen, setIsCollectorModalOpen] = useState(false)
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [deviceToDelete, setDeviceToDelete] = useState<DeviceTelemetry | null>(null)
+  const [toastNotice, setToastNotice] = useState<string | null>(null)
 
   const {
     devices,
@@ -50,6 +56,8 @@ export const DevicesPage: React.FC = () => {
     isCreating,
     deleteDevice,
     isDeleting,
+    deleteAllDevices,
+    isDeletingAll,
   } = useDevices({
     search: searchQuery,
     deviceType: typeFilter !== 'ALL' ? typeFilter : undefined,
@@ -96,6 +104,8 @@ export const DevicesPage: React.FC = () => {
       await createDevice(data)
       setIsAddModalOpen(false)
       reset()
+      setToastNotice(`Successfully registered ${data.hostname} (${data.id}) to inventory!`)
+      setTimeout(() => setToastNotice(null), 3500)
     } catch (err: any) {
       setAddError(err.message || 'Failed to insert device record into Supabase')
     }
@@ -131,14 +141,35 @@ export const DevicesPage: React.FC = () => {
     if (!deviceToDelete) return
     try {
       await deleteDevice(deviceToDelete.id)
+      setToastNotice(`Device ${deviceToDelete.hostname} deleted & moved to Deleted Devices Archive.`)
       setDeviceToDelete(null)
+      setTimeout(() => setToastNotice(null), 3500)
     } catch {
       // Handled in mutation
     }
   }
 
+  const handleConfirmClearAll = async () => {
+    try {
+      const count = await deleteAllDevices()
+      setIsClearAllModalOpen(false)
+      setToastNotice(`Cleared all ${count} devices from inventory! All records archived to Deleted Devices Vault.`)
+      setTimeout(() => setToastNotice(null), 4000)
+    } catch {
+      // Handled
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {/* Toast Notice */}
+      {toastNotice && (
+        <div className="fixed top-20 right-6 z-50 flex items-center gap-2.5 p-3.5 rounded-2xl border border-emerald-500/50 bg-slate-950/95 text-emerald-300 text-xs font-mono shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span className="font-semibold">{toastNotice}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-xl border border-slate-800 bg-slate-950/80 backdrop-blur-xl">
         <div>
@@ -181,15 +212,19 @@ export const DevicesPage: React.FC = () => {
             <span>Export CSV</span>
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            className="text-xs gap-1.5 border-slate-700"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>Sync Database</span>
-          </Button>
+          {/* Delete / Clear All Devices Button */}
+          {devices.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsClearAllModalOpen(true)}
+              className="text-xs gap-1.5 border-red-500/40 text-red-400 hover:bg-red-950/50 hover:border-red-400"
+              title="Delete all active devices to start clean"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Clear All Devices</span>
+            </Button>
+          )}
 
           <Button
             variant="primary"
@@ -264,16 +299,37 @@ export const DevicesPage: React.FC = () => {
           ))}
         </div>
       ) : filteredDevices.length === 0 ? (
-        /* Empty State */
-        <div className="text-center py-16 p-6 rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 space-y-3">
-          <Laptop className="h-10 w-10 text-slate-600 mx-auto" />
-          <h3 className="text-sm font-semibold text-slate-300">No Monitored Endpoints Found</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            No devices matched your query or filter criteria. Try adjusting search filters or register a new endpoint.
-          </p>
-          <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setTypeFilter('ALL') }} className="text-xs">
-            Reset Filters
-          </Button>
+        /* Clean Empty State Ready For New Custom Devices */
+        <div className="text-center py-16 p-8 rounded-2xl border-2 border-dashed border-cyan-500/30 bg-slate-950/60 space-y-4 font-mono">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 mx-auto shadow-neon-cyan/30">
+            <Sparkles className="h-7 w-7" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-100">Inventory Is Clean & Ready</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
+              No active devices in current view. You can now register your own brand new custom endpoints, scan subnets, or view previously archived devices.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsAddModalOpen(true)}
+              className="text-xs font-semibold gap-1.5 shadow-neon-cyan/40"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Register New Endpoint</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/deleted-devices')}
+              className="text-xs gap-1.5 border-amber-500/40 text-amber-300 hover:bg-amber-950/40"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              <span>View Deleted Archive</span>
+            </Button>
+          </div>
         </div>
       ) : (
         /* Device Grid */
@@ -319,50 +375,62 @@ export const DevicesPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-300 space-y-1">
-                  <p className="text-[11px] text-slate-400 truncate">{dev.hostname}</p>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Dept: <strong className="text-slate-300">{dev.department || '—'}</strong></span>
-                    <span>OS: <strong className="text-slate-300">{dev.type}</strong></span>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Hostname:</span>
+                    <span className="text-slate-200 font-medium truncate max-w-[160px]">{dev.hostname}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Department:</span>
+                    <span className="text-slate-300">{dev.department}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Assigned Owner:</span>
+                    <span className="text-slate-300">{dev.owner}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                {/* Metrics Bar */}
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
                   <div>
-                    <span className="text-[10px] font-mono uppercase text-slate-500 block">Compromise Prob</span>
-                    <span className={`font-mono font-bold text-sm ${
-                      dev.compromiseProbability >= 80 ? 'text-red-400' :
-                      dev.compromiseProbability >= 50 ? 'text-orange-400' : 'text-cyan-400'
-                    }`}>
-                      {dev.compromiseProbability}%
+                    <span className="text-slate-500">Risk: </span>
+                    <span
+                      className={`font-bold ${
+                        (dev.riskScore || 0) > 75
+                          ? 'text-red-400'
+                          : (dev.riskScore || 0) > 40
+                          ? 'text-amber-400'
+                          : 'text-emerald-400'
+                      }`}
+                    >
+                      {dev.riskScore || 0}%
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {/* Delete Device Button */}
-                    <button
-                      type="button"
-                      title={`Delete ${dev.id}`}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
                         setDeviceToDelete(dev)
                       }}
-                      className="p-1.5 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-red-400 hover:border-red-500/40 hover:bg-red-950/30 transition-colors"
+                      className="h-7 w-7 p-0 text-slate-500 hover:text-red-400 hover:bg-red-950/40"
+                      title="Decommission & Archive Device"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
 
                     <Button
-                      variant="primary"
+                      variant="ghost"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
                         navigate(`/devices/${dev.id}`)
                       }}
-                      className="h-7 px-2.5 text-xs font-semibold gap-1"
+                      className="h-7 text-xs px-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
                     >
-                      <span>Investigate</span>
-                      <ArrowUpRight className="h-3 w-3" />
+                      Inspect <ArrowUpRight className="h-3 w-3 ml-0.5" />
                     </Button>
                   </div>
                 </div>
@@ -372,155 +440,187 @@ export const DevicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Device Confirmation Dialog */}
-      <Dialog open={!!deviceToDelete} onOpenChange={(open) => !open && setDeviceToDelete(null)}>
-        <DialogContent className="max-w-md bg-slate-950 border-slate-800">
-          <DialogHeader className="border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2 text-red-400 mb-1">
-              <Trash2 className="h-5 w-5" />
-              <DialogTitle className="text-base text-slate-100">Delete Monitored Endpoint</DialogTitle>
+      {/* Modal 1: Clear All Devices Confirmation */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md p-6 rounded-2xl border-2 border-red-500 bg-slate-950 shadow-neon-red space-y-4 font-mono text-xs">
+            <div className="flex items-center justify-between border-b border-red-500/30 pb-3">
+              <h3 className="text-sm font-bold text-red-400 flex items-center gap-2">
+                <Trash2 className="h-4 w-4" />
+                <span>Clear All Active Devices?</span>
+              </h3>
+              <button onClick={() => setIsClearAllModalOpen(false)} className="p-1 rounded text-slate-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <DialogDescription className="text-xs text-slate-400">
-              Are you sure you want to permanently delete{' '}
-              <strong className="text-slate-200 font-mono">{deviceToDelete?.id}</strong> (
-              <span className="font-mono text-cyan-300">{deviceToDelete?.hostname}</span>)?
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="py-3 text-xs text-slate-300 space-y-2">
-            <p>
-              This will remove all associated behavioral telemetry, NetFlow history, and AI baseline models for this device from Supabase.
+            <p className="text-slate-300 leading-relaxed">
+              This will decommission and remove all <strong>{devices.length} active devices</strong> from your inventory so you can add your own fresh endpoints.
             </p>
-            <div className="p-3 rounded-lg bg-red-950/30 border border-red-500/30 text-red-300 text-[11px]">
-              ⚠️ This action cannot be undone.
+
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <span className="text-amber-300 font-semibold block">⚠️ Zero Data Loss Guarantee:</span>
+              <span>All removed devices will be safely preserved in the <strong>Deleted Devices Archive</strong>, where you can restore them at any time.</span>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setIsClearAllModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isDeletingAll}
+                onClick={handleConfirmClearAll}
+                className="bg-red-600 hover:bg-red-500 shadow-neon-red/40"
+              >
+                {isDeletingAll ? 'Clearing...' : 'Yes, Clear All Devices'}
+              </Button>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDeviceToDelete(null)}
-              disabled={isDeleting}
-              className="text-xs"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleConfirmDelete}
-              isLoading={isDeleting}
-              className="text-xs font-semibold gap-1.5 shadow-red-glow-sm"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Confirm Delete</span>
-            </Button>
+      {/* Modal 2: Single Device Delete Confirmation */}
+      {deviceToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md p-6 rounded-2xl border border-red-500/40 bg-slate-950 shadow-2xl space-y-4 font-mono text-xs">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-red-400" />
+                <span>Decommission {deviceToDelete.id}?</span>
+              </h3>
+              <button onClick={() => setDeviceToDelete(null)} className="p-1 rounded text-slate-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-slate-300 leading-relaxed">
+              Remove <strong>{deviceToDelete.hostname}</strong> ({deviceToDelete.ip}) from active monitoring and archive it to the Tombstone Vault?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setDeviceToDelete(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+              >
+                {isDeleting ? 'Archiving...' : 'Decommission & Archive'}
+              </Button>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* Register Endpoint Modal */}
+      {/* Modal 3: Register New Endpoint Dialog */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-md bg-slate-950 border-slate-800">
-          <DialogHeader className="border-b border-slate-800 pb-3">
-            <DialogTitle className="text-base text-slate-100">Register New Network Device</DialogTitle>
+        <DialogContent className="max-w-md font-mono">
+          <DialogHeader>
+            <DialogTitle className="text-base text-slate-100 flex items-center gap-2">
+              <Plus className="h-4 w-4 text-cyan-400" />
+              <span>Register Monitored Endpoint</span>
+            </DialogTitle>
             <DialogDescription className="text-xs text-slate-400">
-              Insert a new monitored endpoint into Supabase security telemetry.
+              Add a new physical, virtual, or containerized endpoint to SentinelX behavioral telemetry ingestion.
             </DialogDescription>
           </DialogHeader>
 
           {addError && (
-            <div className="p-3 rounded-lg border border-red-500/40 bg-red-950/30 text-xs text-red-300">
-              {addError}
+            <div className="p-3 rounded-lg border border-red-500/40 bg-red-950/30 text-xs text-red-300 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+              <span>{addError}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onAddDevice)} className="space-y-3 py-2 text-xs">
+          <form onSubmit={handleSubmit(onAddDevice)} className="space-y-3 text-xs">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Device ID</label>
+              <label className="block text-[11px] text-slate-400 mb-1">Device ID *</label>
               <input
-                type="text"
                 {...register('id')}
-                placeholder="e.g. DEVICE-099"
-                className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
+                placeholder="e.g. DEVICE-099 or SERVER-ALPHA"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:border-cyan-400 focus:outline-none"
               />
-              {errors.id && <p className="text-red-400 mt-0.5 text-[10px]">{errors.id.message}</p>}
+              {errors.id && <span className="text-[10px] text-red-400">{errors.id.message}</span>}
             </div>
 
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Hostname</label>
+              <label className="block text-[11px] text-slate-400 mb-1">Hostname *</label>
               <input
-                type="text"
                 {...register('hostname')}
-                placeholder="e.g. FIN-WS-099"
-                className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
+                placeholder="e.g. Engineering-WS-099"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:border-cyan-400 focus:outline-none"
               />
-              {errors.hostname && <p className="text-red-400 mt-0.5 text-[10px]">{errors.hostname.message}</p>}
+              {errors.hostname && <span className="text-[10px] text-red-400">{errors.hostname.message}</span>}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">IPv4 Socket</label>
+                <label className="block text-[11px] text-slate-400 mb-1">IPv4 Address *</label>
                 <input
-                  type="text"
                   {...register('ip_address')}
-                  placeholder="e.g. 10.0.4.99"
-                  className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
+                  placeholder="192.168.1.99"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:border-cyan-400 focus:outline-none"
                 />
-                {errors.ip_address && <p className="text-red-400 mt-0.5 text-[10px]">{errors.ip_address.message}</p>}
+                {errors.ip_address && <span className="text-[10px] text-red-400">{errors.ip_address.message}</span>}
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Device Type</label>
+                <label className="block text-[11px] text-slate-400 mb-1">Device Type</label>
                 <select
                   {...register('device_type')}
-                  className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:border-cyan-400 focus:outline-none"
                 >
                   <option value="Workstation">Workstation</option>
                   <option value="Server">Server</option>
                   <option value="Laptop">Laptop</option>
+                  <option value="IoT">IoT</option>
                   <option value="Router">Router</option>
                   <option value="Firewall">Firewall</option>
+                  <option value="Cloud">Cloud</option>
+                  <option value="External">External</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Department</label>
+                <label className="block text-[11px] text-slate-400 mb-1">Department *</label>
                 <input
-                  type="text"
                   {...register('department')}
-                  placeholder="e.g. Finance"
-                  className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                  placeholder="e.g. Engineering"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:border-cyan-400 focus:outline-none"
                 />
+                {errors.department && <span className="text-[10px] text-red-400">{errors.department.message}</span>}
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Primary Owner</label>
+                <label className="block text-[11px] text-slate-400 mb-1">Owner *</label>
                 <input
-                  type="text"
                   {...register('owner')}
-                  placeholder="e.g. Alice Doe"
-                  className="h-8.5 w-full rounded border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                  placeholder="e.g. Alice Chen"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:border-cyan-400 focus:outline-none"
                 />
+                {errors.owner && <span className="text-[10px] text-red-400">{errors.owner.message}</span>}
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-800 pt-3 mt-4">
-              <Button variant="ghost" size="sm" type="button" onClick={() => setIsAddModalOpen(false)} className="text-xs">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" type="submit" isLoading={isCreating} className="text-xs font-semibold">
-                Submit to Supabase
+              <Button type="submit" variant="primary" size="sm" disabled={isCreating}>
+                {isCreating ? 'Registering...' : 'Register Endpoint'}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Subnet Scanner & Telemetry Collector Modal */}
+      {/* Device Collector Modal */}
       <DeviceCollectorModal
         isOpen={isCollectorModalOpen}
         onClose={() => setIsCollectorModalOpen(false)}

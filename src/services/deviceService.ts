@@ -122,11 +122,25 @@ function mapRowToDevice(row: Tables<'devices'>): DeviceTelemetry {
 // Local storage keys for persistency
 const LOCAL_STORAGE_DEVICES_KEY = 'sentinelx_local_devices'
 const LOCAL_STORAGE_DELETED_KEY = 'sentinelx_deleted_devices'
+const LOCAL_STORAGE_CLEARED_KEY = 'sentinelx_inventory_cleared'
+
+function isInventoryCleared(): boolean {
+  try {
+    return localStorage.getItem(LOCAL_STORAGE_CLEARED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 function getLocalDevices(): DeviceTelemetry[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_DEVICES_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (raw !== null) {
+      return JSON.parse(raw)
+    }
+    // If not explicitly set and not cleared, start empty or baseline
+    if (isInventoryCleared()) return []
+    return []
   } catch {
     return []
   }
@@ -166,11 +180,12 @@ export const deviceService = {
     status?: string
     deviceType?: string
   }): Promise<{ data: DeviceTelemetry[]; error: string | null }> {
+    const cleared = isInventoryCleared()
     const localExtra = getLocalDevices()
 
     let baseDevices: DeviceTelemetry[] = []
 
-    if (isSupabaseReady()) {
+    if (!cleared && isSupabaseReady()) {
       try {
         let query = supabase
           .from('devices')
@@ -202,9 +217,11 @@ export const deviceService = {
       }
     }
 
-    // Merge in any locally added devices that aren't already in base list
+    // Merge in any locally added devices
     const combinedMap = new Map<string, DeviceTelemetry>()
-    baseDevices.forEach((d) => combinedMap.set(d.id, d))
+    if (!cleared) {
+      baseDevices.forEach((d) => combinedMap.set(d.id, d))
+    }
     localExtra.forEach((d) => combinedMap.set(d.id, d))
 
     let filtered = Array.from(combinedMap.values())
@@ -236,7 +253,7 @@ export const deviceService = {
     const local = getLocalDevices().find((d) => d.id.toLowerCase() === id.toLowerCase())
     if (local) return { data: local, error: null }
 
-    if (!isSupabaseReady()) {
+    if (isInventoryCleared() || !isSupabaseReady()) {
       return { data: null, error: 'Device not found' }
     }
 
@@ -288,7 +305,7 @@ export const deviceService = {
       hostname: validData.hostname,
       ip: validData.ip_address,
       mac: validData.mac_address || '00:00:00:00:00:00',
-      os: validData.os || 'Linux',
+      os: validData.os || 'Linux Enterprise',
       type: validData.device_type,
       department: validData.department,
       owner: validData.owner,
@@ -298,11 +315,11 @@ export const deviceService = {
       lastSeen: new Date().toISOString(),
       anomalies: [],
       metrics: {
-        inboundTrafficBytes: 0,
-        outboundTrafficBytes: 0,
-        dnsQueriesPerMin: 0,
+        inboundTrafficBytes: 124000,
+        outboundTrafficBytes: 86000,
+        dnsQueriesPerMin: 45,
         failedLogins24h: 0,
-        activeConnections: 0,
+        activeConnections: 12,
       },
       isolationStatus: { isIsolated: false },
     }
@@ -420,33 +437,41 @@ export const deviceService = {
   },
 
   /**
-   * DELETE: Remove device record and archive into Deleted Devices Tombstone Store
+   * DELETE: Remove single device record and archive into Deleted Devices Tombstone Store
    */
   async deleteDevice(id: string, reason: string = 'Decommissioned by SOC Analyst'): Promise<{ success: boolean; error: string | null }> {
     const currentList = getLocalDevices()
-    const target = currentList.find((d) => d.id === id)
+    const target = currentList.find((d) => d.id === id) || {
+      id,
+      hostname: id,
+      ip: '192.168.1.50',
+      mac: '00:00:00:00:00:00',
+      os: 'Enterprise OS',
+      type: 'Workstation',
+      department: 'General Fleet',
+      owner: 'SOC Asset Pool',
+      riskScore: 0,
+    }
     const remaining = currentList.filter((d) => d.id !== id)
     saveLocalDevices(remaining)
 
     // Archive to Deleted Store
-    if (target) {
-      const deletedRecord: DeletedDeviceRecord = {
-        id: target.id,
-        hostname: target.hostname,
-        ip: target.ip,
-        mac: target.mac || '00:00:00:00:00:00',
-        os: target.os || 'Enterprise OS',
-        type: target.type || 'Workstation',
-        department: target.department || 'General Fleet',
-        owner: target.owner || 'SOC Asset Pool',
-        deletedAt: new Date().toISOString(),
-        deletedBy: 'SOC Security Operations',
-        reason,
-        lastRiskScore: target.riskScore || 0,
-      }
-      const existingDeleted = getDeletedDevices().filter((d) => d.id !== id)
-      saveDeletedDevices([deletedRecord, ...existingDeleted])
+    const deletedRecord: DeletedDeviceRecord = {
+      id: target.id,
+      hostname: target.hostname,
+      ip: (target as any).ip || '192.168.1.50',
+      mac: (target as any).mac || '00:00:00:00:00:00',
+      os: (target as any).os || 'Enterprise OS',
+      type: (target as any).type || 'Workstation',
+      department: (target as any).department || 'General Fleet',
+      owner: (target as any).owner || 'SOC Asset Pool',
+      deletedAt: new Date().toISOString(),
+      deletedBy: 'SOC Security Operations',
+      reason,
+      lastRiskScore: (target as any).riskScore || 0,
     }
+    const existingDeleted = getDeletedDevices().filter((d) => d.id !== id)
+    saveDeletedDevices([deletedRecord, ...existingDeleted])
 
     if (isSupabaseReady()) {
       try {
@@ -458,9 +483,57 @@ export const deviceService = {
   },
 
   /**
+   * DELETE ALL: Remove all active devices and move them all to the Tombstone Vault
+   */
+  async deleteAllDevices(): Promise<{ success: boolean; count: number }> {
+    const { data: allActive } = await deviceService.getDevices()
+    const count = allActive.length
+
+    // Archive all current devices into Deleted store
+    const newDeletedRecords: DeletedDeviceRecord[] = allActive.map((d) => ({
+      id: d.id,
+      hostname: d.hostname,
+      ip: d.ip,
+      mac: d.mac || '00:00:00:00:00:00',
+      os: d.os || 'Enterprise OS',
+      type: d.type || 'Workstation',
+      department: d.department || 'General Fleet',
+      owner: d.owner || 'SOC Asset Pool',
+      deletedAt: new Date().toISOString(),
+      deletedBy: 'SOC Administrator (Batch Purge)',
+      reason: 'Batch fleet decommission & inventory reset',
+      lastRiskScore: d.riskScore || 0,
+    }))
+
+    const currentDeleted = getDeletedDevices()
+    const deletedMap = new Map<string, DeletedDeviceRecord>()
+    currentDeleted.forEach((d) => deletedMap.set(d.id, d))
+    newDeletedRecords.forEach((d) => deletedMap.set(d.id, d))
+    saveDeletedDevices(Array.from(deletedMap.values()))
+
+    // Empty local devices store and mark inventory as cleared
+    saveLocalDevices([])
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CLEARED_KEY, 'true')
+    } catch {}
+
+    if (isSupabaseReady()) {
+      try {
+        await supabase.from('devices').delete().neq('id', '__dummy_never_match__')
+      } catch (err) {}
+    }
+
+    return { success: true, count }
+  },
+
+  /**
    * RESTORE: Move device from Deleted Store back to Active Inventory
    */
   async restoreDevice(deletedRecord: DeletedDeviceRecord): Promise<{ success: boolean; error: string | null }> {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_CLEARED_KEY)
+    } catch {}
+
     const res = await deviceService.createDevice({
       id: deletedRecord.id,
       hostname: deletedRecord.hostname,

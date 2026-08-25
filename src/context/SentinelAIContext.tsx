@@ -33,12 +33,12 @@ const INITIAL_MESSAGE: AIChatMessage = {
   id: 'msg-welcome',
   sender: 'assistant',
   timestamp: new Date().toLocaleTimeString(),
-  content: `Hello, Analyst. I'm **Sentinel AI Assistant & Autonomous SOC Copilot**.\n\nYou can ask me questions or **give direct operational commands** such as:\n- *"Delete device DEVICE-042"*\n- *"Quarantine device DEVICE-042"*\n- *"Block IP 185.220.101.5"*\n- *"Unblock IP 185.220.101.5"*\n- *"Restore device DEVICE-LEGACY-019"*\n- *"Switch to Stage 4 Exfiltration"*\n\nI will execute the actions live in the platform and log audit trails!`,
+  content: `Hello, Analyst. I'm **Sentinel AI Assistant & Autonomous SOC Copilot**.\n\nYou can ask me questions or **give direct operational commands** such as:\n- *"Delete all devices"* (Clears inventory so you can add new endpoints)\n- *"Delete device DEVICE-042"*\n- *"Quarantine device DEVICE-042"*\n- *"Block IP 185.220.101.5"*\n- *"Unblock IP 185.220.101.5"*\n- *"Restore device DEVICE-LEGACY-019"*\n\nI will execute the actions live in the platform and log audit trails!`,
   suggestedActions: [
-    { id: 'qa-1', label: 'Quarantine DEVICE-042', actionType: 'quarantine' },
-    { id: 'qa-2', label: 'Delete device DEVICE-042', actionType: 'delete_device' },
-    { id: 'qa-3', label: 'Block IP 185.220.101.5', actionType: 'block_ip' },
-    { id: 'qa-4', label: 'Trace Attack Path', actionType: 'navigate', payload: { path: '/attack-graph' } },
+    { id: 'qa-1', label: 'Clear All Devices', actionType: 'delete_all' },
+    { id: 'qa-2', label: 'Register New Endpoint', actionType: 'navigate', payload: { path: '/devices' } },
+    { id: 'qa-3', label: 'View Deleted Archive', actionType: 'navigate', payload: { path: '/deleted-devices' } },
+    { id: 'qa-4', label: 'Quarantine DEVICE-042', actionType: 'quarantine' },
   ],
 }
 
@@ -55,7 +55,7 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   })
 
   // Live platform hooks for executing real system commands
-  const { devices, deleteDevice, refetch: refetchDevices } = useDevices()
+  const { devices, deleteDevice, deleteAllDevices, refetch: refetchDevices } = useDevices()
   const { alerts } = useAlerts()
   const { isolateDevice, unisolateDevice, blockIp, unblockIp, addInvestigationNote } = useInvestigation()
   const { setStageIndex } = useDemoScenario()
@@ -75,7 +75,6 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Helper to resolve device ID from command text or current context
   const resolveTargetDevice = (text: string) => {
     const upper = text.toUpperCase()
-    // Explicit pattern matches: DEVICE-042, DEV-042, SERVER-07, FIN-WS-042, etc.
     const match = upper.match(/(DEVICE-[A-Z0-9_-]+|SERVER-[A-Z0-9_-]+|DEV-[A-Z0-9_-]+|FIN-WS-[A-Z0-9_-]+|DB-CORE-[A-Z0-9_-]+|IOT-[A-Z0-9_-]+|DEVICE\s*([0-9]+))/i)
     if (match) {
       let matchedId = match[1]
@@ -84,7 +83,6 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (found) return found
       return { id: matchedId, hostname: `Host (${matchedId})` }
     }
-    // Check if number alone given (e.g. "delete device 42")
     const numMatch = text.match(/\b(?:device|host|workstation|server)\s*#?([0-9]+)\b/i)
     if (numMatch) {
       const num = numMatch[1].padStart(3, '0')
@@ -93,18 +91,15 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (found) return found
       return { id: targetId, hostname: `Device ${num}` }
     }
-    // Fallback to active context if on a device page
     if (currentContext.type === 'device' && currentContext.id) {
       const found = devices.find((d) => d.id.toLowerCase() === currentContext.id?.toLowerCase())
       if (found) return found
       return { id: currentContext.id, hostname: currentContext.name || currentContext.id }
     }
-    // Default fallback to first compromised device or device-042
     const comp = devices.find((d) => d.status === 'COMPROMISED') || devices[0]
     return comp || { id: 'DEVICE-042', hostname: 'Workstation-Fin (DEVICE-042)' }
   }
 
-  // Helper to extract IP from text
   const extractIpAddress = (text: string) => {
     const ipMatch = text.match(/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/)
     return ipMatch ? ipMatch[0] : null
@@ -129,7 +124,32 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     try {
       // ══════════════════════════════════════════════════════════════════════
-      // 1. COMMAND: DELETE / DECOMMISSION DEVICE
+      // 0. COMMAND: DELETE ALL DEVICES / CLEAR INVENTORY
+      // ══════════════════════════════════════════════════════════════════════
+      if (
+        (lower.includes('delete all') || lower.includes('clear all') || lower.includes('remove all') || lower.includes('delete al') || lower.includes('clear inventory')) &&
+        (lower.includes('device') || lower.includes('devices') || lower.includes('endpoint') || lower.includes('all'))
+      ) {
+        const count = await deleteAllDevices()
+        refetchDevices()
+
+        const responseMsg: AIChatMessage = {
+          id: `ai-${Date.now()}`,
+          sender: 'assistant',
+          timestamp: new Date().toLocaleTimeString(),
+          content: `🗑️ **ACTION EXECUTED: All Devices Cleared & Archived**\n\nI have decommissioned and removed all **${count} active devices** from your inventory.\n\n- **Inventory Status**: Clean & ready for new endpoints\n- **Archive Status**: All ${count} devices safely preserved in the **[Deleted Devices Archive](/deleted-devices)**\n- **Next Step**: You can now register your brand new endpoints from the **[Devices Inventory](/devices)**!`,
+          confidence: 100,
+          suggestedActions: [
+            { id: 'act-new-1', label: 'Register New Endpoint', actionType: 'navigate', payload: { path: '/devices' } },
+            { id: 'act-new-2', label: 'View Deleted Archive', actionType: 'navigate', payload: { path: '/deleted-devices' } },
+          ],
+        }
+        setMessages((prev) => [...prev, responseMsg])
+        return
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
+      // 1. COMMAND: DELETE / DECOMMISSION SINGLE DEVICE
       // ══════════════════════════════════════════════════════════════════════
       if (
         (lower.includes('delete') || lower.includes('remove') || lower.includes('decommission') || lower.includes('purge')) &&
@@ -338,7 +358,7 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setIsLoading(false)
     }
-  }, [currentContext, devices, alerts, deleteDevice, isolateDevice, unisolateDevice, blockIp, unblockIp, addInvestigationNote, setStageIndex, refetchDevices])
+  }, [currentContext, devices, alerts, deleteDevice, deleteAllDevices, isolateDevice, unisolateDevice, blockIp, unblockIp, addInvestigationNote, setStageIndex, refetchDevices])
 
   const sendQuickAction = useCallback((actionLabel: string) => {
     sendMessage(actionLabel)
