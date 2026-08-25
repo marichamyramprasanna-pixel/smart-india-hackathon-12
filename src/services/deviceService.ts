@@ -26,6 +26,66 @@ export const deviceUpdateSchema = deviceCreateSchema.partial()
 export type DeviceCreateInput = z.infer<typeof deviceCreateSchema>
 export type DeviceUpdateInput = z.infer<typeof deviceUpdateSchema>
 
+export interface DeletedDeviceRecord {
+  id: string
+  hostname: string
+  ip: string
+  mac: string
+  os: string
+  type: string
+  department: string
+  owner: string
+  deletedAt: string
+  deletedBy: string
+  reason: string
+  lastRiskScore: number
+}
+
+const DEFAULT_DELETED_DEVICES: DeletedDeviceRecord[] = [
+  {
+    id: 'DEVICE-LEGACY-019',
+    hostname: 'Workstation-Legacy (FIN-WS-019)',
+    ip: '192.168.1.119',
+    mac: '00:0C:29:4F:19:AA',
+    os: 'Windows 7 Enterprise (EOL)',
+    type: 'Workstation',
+    department: 'Finance & Accounts',
+    owner: 'Decommissioned Fleet',
+    deletedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    deletedBy: 'SOC Lead Architect',
+    reason: 'End-of-Life OS retirement & hardware refresh cycle',
+    lastRiskScore: 24,
+  },
+  {
+    id: 'SERVER-RADIUS-OLD',
+    hostname: 'Radius-Backup-02 (SRV-RAD-02)',
+    ip: '192.168.1.202',
+    mac: '00:50:56:C0:02:11',
+    os: 'Ubuntu 18.04 LTS',
+    type: 'Server',
+    department: 'Core Infrastructure',
+    owner: 'Network Engineering',
+    deletedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+    deletedBy: 'SecOps Automation',
+    reason: 'Migrated to cloud RADIUS gateway; local VM decommissioned',
+    lastRiskScore: 10,
+  },
+  {
+    id: 'IOT-PRINTER-088',
+    hostname: 'Executive-Floor-MFD (PRN-088)',
+    ip: '192.168.1.88',
+    mac: '00:1B:78:33:88:99',
+    os: 'Embedded Firmware v3.1',
+    type: 'IoT',
+    department: 'Corporate Services',
+    owner: 'Facility Ops',
+    deletedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+    deletedBy: 'Vulnerability Remediation Team',
+    reason: 'Unpatchable CVE buffer overflow vulnerability; replaced with encrypted MFD unit',
+    lastRiskScore: 82,
+  },
+]
+
 /**
  * Maps database Row to frontend DeviceTelemetry interface
  */
@@ -59,8 +119,9 @@ function mapRowToDevice(row: Tables<'devices'>): DeviceTelemetry {
   }
 }
 
-// Local storage key for persistency across demo session
+// Local storage keys for persistency
 const LOCAL_STORAGE_DEVICES_KEY = 'sentinelx_local_devices'
+const LOCAL_STORAGE_DELETED_KEY = 'sentinelx_deleted_devices'
 
 function getLocalDevices(): DeviceTelemetry[] {
   try {
@@ -74,6 +135,25 @@ function getLocalDevices(): DeviceTelemetry[] {
 function saveLocalDevices(devices: DeviceTelemetry[]) {
   try {
     localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, JSON.stringify(devices))
+  } catch {}
+}
+
+export function getDeletedDevices(): DeletedDeviceRecord[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_KEY)
+    const list: DeletedDeviceRecord[] = raw ? JSON.parse(raw) : []
+    const combinedMap = new Map<string, DeletedDeviceRecord>()
+    DEFAULT_DELETED_DEVICES.forEach((d) => combinedMap.set(d.id, d))
+    list.forEach((d) => combinedMap.set(d.id, d))
+    return Array.from(combinedMap.values())
+  } catch {
+    return DEFAULT_DELETED_DEVICES
+  }
+}
+
+export function saveDeletedDevices(list: DeletedDeviceRecord[]) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, JSON.stringify(list))
   } catch {}
 }
 
@@ -231,6 +311,10 @@ export const deviceService = {
     const existingLocal = getLocalDevices().filter((d) => d.id !== validData.id)
     saveLocalDevices([localNewDevice, ...existingLocal])
 
+    // If it was in deleted list, remove it
+    const updatedDeleted = getDeletedDevices().filter((d) => d.id !== validData.id)
+    saveDeletedDevices(updatedDeleted)
+
     if (isSupabaseReady()) {
       try {
         const { data, error } = await supabase
@@ -243,7 +327,7 @@ export const deviceService = {
           return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
         }
       } catch (err) {
-        // Fallback gracefully on RLS restrictions without throwing error in UI
+        // Fallback gracefully
       }
     }
 
@@ -300,7 +384,6 @@ export const deviceService = {
     reason?: string,
     analystName?: string
   ): Promise<{ success: boolean; error: string | null }> {
-    // Update local cache
     const currentList = getLocalDevices()
     const updatedList = currentList.map((d) =>
       d.id === deviceId
@@ -337,11 +420,33 @@ export const deviceService = {
   },
 
   /**
-   * DELETE: Remove device record
+   * DELETE: Remove device record and archive into Deleted Devices Tombstone Store
    */
-  async deleteDevice(id: string): Promise<{ success: boolean; error: string | null }> {
-    const currentList = getLocalDevices().filter((d) => d.id !== id)
-    saveLocalDevices(currentList)
+  async deleteDevice(id: string, reason: string = 'Decommissioned by SOC Analyst'): Promise<{ success: boolean; error: string | null }> {
+    const currentList = getLocalDevices()
+    const target = currentList.find((d) => d.id === id)
+    const remaining = currentList.filter((d) => d.id !== id)
+    saveLocalDevices(remaining)
+
+    // Archive to Deleted Store
+    if (target) {
+      const deletedRecord: DeletedDeviceRecord = {
+        id: target.id,
+        hostname: target.hostname,
+        ip: target.ip,
+        mac: target.mac || '00:00:00:00:00:00',
+        os: target.os || 'Enterprise OS',
+        type: target.type || 'Workstation',
+        department: target.department || 'General Fleet',
+        owner: target.owner || 'SOC Asset Pool',
+        deletedAt: new Date().toISOString(),
+        deletedBy: 'SOC Security Operations',
+        reason,
+        lastRiskScore: target.riskScore || 0,
+      }
+      const existingDeleted = getDeletedDevices().filter((d) => d.id !== id)
+      saveDeletedDevices([deletedRecord, ...existingDeleted])
+    }
 
     if (isSupabaseReady()) {
       try {
@@ -351,5 +456,40 @@ export const deviceService = {
 
     return { success: true, error: null }
   },
-}
 
+  /**
+   * RESTORE: Move device from Deleted Store back to Active Inventory
+   */
+  async restoreDevice(deletedRecord: DeletedDeviceRecord): Promise<{ success: boolean; error: string | null }> {
+    const res = await deviceService.createDevice({
+      id: deletedRecord.id,
+      hostname: deletedRecord.hostname,
+      ip_address: deletedRecord.ip,
+      mac_address: deletedRecord.mac,
+      os: deletedRecord.os,
+      device_type: (deletedRecord.type as any) || 'Workstation',
+      department: deletedRecord.department,
+      owner: deletedRecord.owner,
+      status: 'HEALTHY',
+      risk_score: 0,
+      compromise_probability: 0,
+    })
+
+    if (!res.error) {
+      const remainingDeleted = getDeletedDevices().filter((d) => d.id !== deletedRecord.id)
+      saveDeletedDevices(remainingDeleted)
+      return { success: true, error: null }
+    }
+
+    return { success: false, error: res.error }
+  },
+
+  /**
+   * PURGE: Permanently erase tombstone record
+   */
+  async purgeDeletedDevice(id: string): Promise<{ success: boolean }> {
+    const remaining = getDeletedDevices().filter((d) => d.id !== id)
+    saveDeletedDevices(remaining)
+    return { success: true }
+  },
+}

@@ -18,6 +18,7 @@ import { AttackTimelinePage } from './pages/AttackTimelinePage'
 import { DevicesPage } from './pages/DevicesPage'
 import { DeviceDetailPage } from './pages/DeviceDetailPage'
 import { BlockedDevicesPage } from './pages/BlockedDevicesPage'
+import { DeletedDevicesPage } from './pages/DeletedDevicesPage'
 import { AIAnalysisPage } from './pages/AIAnalysisPage'
 import { AIChatPage } from './pages/AIChatPage'
 import { ReportsPage } from './pages/ReportsPage'
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
                       <Route path="devices" element={<DevicesPage />} />
                       <Route path="devices/:id" element={<DeviceDetailPage />} />
                       <Route path="blocked-devices" element={<BlockedDevicesPage />} />
+                      <Route path="deleted-devices" element={<DeletedDevicesPage />} />
                       <Route path="ai-analysis" element={<AIAnalysisPage />} />
                       <Route path="ai-chat" element={<AIChatPage />} />
                       <Route path="reports" element={<ReportsPage />} />

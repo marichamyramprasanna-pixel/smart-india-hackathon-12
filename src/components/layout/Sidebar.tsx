@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ShieldCheck,
   ShieldBan,
+  Archive,
   Bot,
   X,
 } from 'lucide-react'
@@ -87,6 +88,13 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       icon: <ShieldBan className="h-4 w-4 text-rose-400" />,
       color: 'hover:text-rose-300 hover:bg-rose-950/40 border-rose-500/30',
       badge: 'QUARANTINE',
+    },
+    {
+      name: 'Deleted Devices',
+      href: '/deleted-devices',
+      icon: <Archive className="h-4 w-4 text-amber-400" />,
+      color: 'hover:text-amber-300 hover:bg-amber-950/40 border-amber-500/30',
+      badge: 'ARCHIVE',
     },
     {
       name: 'AI Anomaly Hub',
