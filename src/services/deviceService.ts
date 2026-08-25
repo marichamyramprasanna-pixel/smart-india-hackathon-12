@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { supabase, isSupabaseReady } from '../lib/supabase'
 import { handleSupabaseError } from '../lib/supabaseError'
 import { DeviceTelemetry } from '../types/device'
-import { demoDevices } from '../data/demo/devices'
 import { env } from '../config/env'
 import { Tables, InsertDto, UpdateDto } from '../types/database'
 
@@ -124,6 +123,10 @@ const LOCAL_STORAGE_DEVICES_KEY = 'sentinelx_local_devices'
 const LOCAL_STORAGE_DELETED_KEY = 'sentinelx_deleted_devices'
 const LOCAL_STORAGE_CLEARED_KEY = 'sentinelx_inventory_cleared'
 
+// Resilient In-Memory store
+let inMemoryDevices: DeviceTelemetry[] = []
+let inMemoryDeleted: DeletedDeviceRecord[] = DEFAULT_DELETED_DEVICES
+
 function isInventoryCleared(): boolean {
   try {
     const val = localStorage.getItem(LOCAL_STORAGE_CLEARED_KEY)
@@ -138,15 +141,15 @@ function getLocalDevices(): DeviceTelemetry[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_DEVICES_KEY)
     if (raw !== null) {
-      return JSON.parse(raw)
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
     }
-    return []
-  } catch {
-    return []
-  }
+  } catch {}
+  return inMemoryDevices
 }
 
 function saveLocalDevices(devices: DeviceTelemetry[]) {
+  inMemoryDevices = devices
   try {
     localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, JSON.stringify(devices))
   } catch {}
@@ -155,17 +158,18 @@ function saveLocalDevices(devices: DeviceTelemetry[]) {
 export function getDeletedDevices(): DeletedDeviceRecord[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_KEY)
-    const list: DeletedDeviceRecord[] = raw ? JSON.parse(raw) : []
+    const list: DeletedDeviceRecord[] = raw ? JSON.parse(raw) : inMemoryDeleted
     const combinedMap = new Map<string, DeletedDeviceRecord>()
     DEFAULT_DELETED_DEVICES.forEach((d) => combinedMap.set(d.id, d))
     list.forEach((d) => combinedMap.set(d.id, d))
     return Array.from(combinedMap.values())
   } catch {
-    return DEFAULT_DELETED_DEVICES
+    return inMemoryDeleted
   }
 }
 
 export function saveDeletedDevices(list: DeletedDeviceRecord[]) {
+  inMemoryDeleted = list
   try {
     localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, JSON.stringify(list))
   } catch {}
@@ -216,11 +220,6 @@ export const deviceService = {
       } catch (err) {
         baseDevices = []
       }
-    }
-
-    // In unit test runner environment where localStorage is empty and unconfigured:
-    if (!cleared && baseDevices.length === 0 && localExtra.length === 0 && typeof window === 'undefined') {
-      baseDevices = demoDevices
     }
 
     // Merge in any locally added devices

@@ -68,10 +68,18 @@ describe('Supabase Service Layer & Validation', () => {
     expect(error.message).toContain('already exists')
   })
 
-  it('provides reliable fallback devices when database is offline/unconfigured', async () => {
+  it('creates and retrieves custom devices cleanly', async () => {
+    const createRes = await deviceService.createDevice({
+      id: 'DEVICE-TEST-01',
+      hostname: 'Test-Host-01',
+      ip_address: '10.0.1.1',
+      device_type: 'Workstation',
+      department: 'QA',
+      owner: 'Test User',
+    })
+    expect(createRes.error).toBeNull()
     const res = await deviceService.getDevices()
-    expect(res.data.length).toBeGreaterThanOrEqual(3)
-    expect(res.data.some((d) => d.id === 'DEVICE-042')).toBe(true)
+    expect(res.data.some((d) => d.id === 'DEVICE-TEST-01')).toBe(true)
   })
 
   it('handles getSession() gracefully with zero unhandled errors', async () => {
