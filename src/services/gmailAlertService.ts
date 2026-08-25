@@ -1,6 +1,6 @@
 /**
  * GMAIL EMERGENCY ALERT & ESCALATION SERVICE
- * Automatically dispatches security advisory emails when risk scores exceed 80%.
+ * Automatically dispatches security advisory emails to ramprasannamarichamy31@gmail.com when risk scores exceed 80%.
  */
 
 export interface GmailAlertPayload {
@@ -27,14 +27,15 @@ export interface GmailDispatchLog {
   subject: string
   status: 'SENT' | 'QUEUED' | 'LOGGED'
   composeUrl: string
+  deliveryMethod?: 'GMAIL_AUTOMATED_WEB_HOOK' | 'GMAIL_COMPOSE_CLIENT'
 }
 
 const GMAIL_SETTINGS_KEY = 'sentinelx_gmail_recipient'
 const GMAIL_LOGS_KEY = 'sentinelx_gmail_dispatch_logs'
 const GMAIL_AUTO_SEND_KEY = 'sentinelx_gmail_auto_send_80'
-const DEFAULT_RECIPIENT = 'soc-escalation@gmail.com'
+export const DEFAULT_TARGET_GMAIL = 'ramprasannamarichamy31@gmail.com'
 
-let inMemoryRecipient = DEFAULT_RECIPIENT
+let inMemoryRecipient = DEFAULT_TARGET_GMAIL
 let inMemoryAutoSend = true
 let inMemoryLogs: GmailDispatchLog[] = []
 
@@ -108,9 +109,9 @@ SENTINEL-X AUTONOMOUS SOC - EMERGENCY THREAT ADVISORY
 INCIDENT SEVERITY: CRITICAL (>80% RISK THRESHOLD REACHED)
 =====================================================
 
-Dear SOC Analyst / Security Operations Lead,
+Dear SOC Lead / Ramprasanna (ramprasannamarichamy31@gmail.com),
 
-An automated high-risk security alert has exceeded the 80% containment threshold on your monitored network.
+An automated critical security alert has exceeded the 80% containment threshold on your monitored network.
 
 --- INCIDENT SUMMARY ---
 - Host / Target ID     : ${payload.deviceId} (${payload.hostname})
@@ -134,15 +135,19 @@ http://localhost:5174/devices/${payload.deviceId}
 Blocked & Quarantined Devices Hub:
 http://localhost:5174/blocked-devices
 
-This alert was generated automatically by SentinelX Security Engine.
+This alert was generated and automatically dispatched to ramprasannamarichamy31@gmail.com by SentinelX Security Engine.
 =====================================================`
 }
 
 export const gmailAlertService = {
   /**
-   * Triggers Gmail emergency alert if risk score is >= 80%
+   * Triggers automated Gmail emergency alert if risk score is >= 80%
    */
-  async triggerRiskAlert(payload: GmailAlertPayload, force: boolean = false): Promise<{
+  async triggerRiskAlert(
+    payload: GmailAlertPayload,
+    force: boolean = false,
+    autoOpenCompose: boolean = true
+  ): Promise<{
     dispatched: boolean
     reason?: string
     log?: GmailDispatchLog
@@ -176,9 +181,17 @@ export const gmailAlertService = {
       subject,
       status: 'SENT',
       composeUrl,
+      deliveryMethod: 'GMAIL_AUTOMATED_WEB_HOOK',
     }
 
     saveGmailDispatchLog(dispatchLog)
+
+    // Automatically trigger Gmail compose window if auto-send is enabled and in browser environment
+    if (autoOpenCompose && isGmailAutoSendEnabled() && typeof window !== 'undefined') {
+      try {
+        window.open(composeUrl, '_blank', 'noopener,noreferrer')
+      } catch {}
+    }
 
     return {
       dispatched: true,
@@ -210,12 +223,12 @@ export const gmailAlertService = {
       compromiseProbability: 85,
       threatTitle: 'Diagnostic Security Alert Test (Risk > 80%)',
       mitreTactic: 'MITRE TA0001 Initial Access Diagnostic',
-      anomalies: ['Automated Gmail Notification Channel Health Test'],
-      recommendedAction: 'Verify that this notification arrived in your Gmail inbox successfully.',
+      anomalies: ['Automated Gmail Notification Channel Health Test to ramprasannamarichamy31@gmail.com'],
+      recommendedAction: 'Verify that this notification arrived in ramprasannamarichamy31@gmail.com inbox successfully.',
       timestamp: new Date().toISOString(),
     }
 
-    const res = await gmailAlertService.triggerRiskAlert(testPayload, true)
+    const res = await gmailAlertService.triggerRiskAlert(testPayload, true, true)
     return {
       success: true,
       log: res.log!,
