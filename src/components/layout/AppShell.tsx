@@ -8,6 +8,7 @@ import { CommandPalette } from './CommandPalette'
 import { CyberCursor } from '../common/CyberCursor'
 import { ScrollEffects } from '../common/ScrollEffects'
 import { ScrollParticleMatrix } from '../common/ScrollParticleMatrix'
+import { ThreatAutoBlockInterceptor } from '../common/ThreatAutoBlockInterceptor'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
 
@@ -82,6 +83,9 @@ export const AppShell: React.FC = () => {
 
       {/* Cyber Particle Sparks & Matrix Rain Stream Canvas on Scroll */}
       <ScrollParticleMatrix />
+
+      {/* Automated >90% Threat Interceptor & Quarantine Containment */}
+      <ThreatAutoBlockInterceptor />
     </div>
   )
 }
