@@ -32,40 +32,64 @@ export const PacketStreams: React.FC<PacketStreamsProps> = ({ nodes, links }) =>
         ]
         const geometry = new THREE.BufferGeometry().setFromPoints(points)
 
-        let color = '#38BDF8' // Blue
-        if (link.status === 'compromised') color = '#EF4444' // Red
-        else if (link.status === 'suspicious') color = '#F59E0B' // Amber
+        let color = '#38BDF8' // Sky Blue
+        let opacity = 0.4
+        const isBlocked = link.status === 'blocked'
+        const isTombstone = link.status === 'tombstone'
+
+        if (link.status === 'compromised') {
+          color = '#EF4444' // Red
+          opacity = 0.8
+        } else if (link.status === 'suspicious') {
+          color = '#F59E0B' // Amber
+          opacity = 0.6
+        } else if (isBlocked) {
+          color = '#F43F5E' // Rose Red (Quarantine / Null-Route)
+          opacity = 0.35
+        } else if (isTombstone) {
+          color = '#D97706' // Faint Amber
+          opacity = 0.15
+        }
 
         return {
           id: link.id,
           geometry,
           color,
+          opacity,
           link,
           srcPos,
           tgtPos,
+          hasPackets: !isBlocked && !isTombstone,
         }
       })
       .filter(Boolean) as {
       id: string
       geometry: THREE.BufferGeometry
       color: string
+      opacity: number
       link: Network3DLink
       srcPos: [number, number, number]
       tgtPos: [number, number, number]
+      hasPackets: boolean
     }[]
   }, [links, nodeMap])
 
-  // Animated packet particles travelling along links
+  // Active packet lines that actually transmit data
+  const activePacketLines = useMemo(() => {
+    return linkLines.filter((l) => l.hasPackets)
+  }, [linkLines])
+
+  // Animated packet particles travelling along active links
   useFrame(({ clock }) => {
-    if (!particleGroupRef.current) return
+    if (!particleGroupRef.current || activePacketLines.length === 0) return
     const t = clock.getElapsedTime()
 
     particleGroupRef.current.children.forEach((child, index) => {
-      const lineData = linkLines[index % linkLines.length]
+      const lineData = activePacketLines[index % activePacketLines.length]
       if (!lineData) return
 
-      const speed = (lineData.link.trafficSpeed || 1) * 0.4
-      const progress = (t * speed + index * 0.25) % 1
+      const speed = (lineData.link.trafficSpeed || 1) * 0.45
+      const progress = (t * speed + index * 0.22) % 1
 
       const src = new THREE.Vector3(...lineData.srcPos)
       const tgt = new THREE.Vector3(...lineData.tgtPos)
@@ -77,22 +101,22 @@ export const PacketStreams: React.FC<PacketStreamsProps> = ({ nodes, links }) =>
 
   return (
     <group>
-      {/* Static Connection Lines */}
+      {/* Static & Severed Connection Lines */}
       {linkLines.map((l) => (
         // @ts-expect-error - Three.js line primitive JSX
         <line key={l.id} geometry={l.geometry}>
           <lineBasicMaterial
             color={l.color}
             transparent
-            opacity={l.link.status === 'compromised' ? 0.75 : 0.35}
+            opacity={l.opacity}
             linewidth={1}
           />
         </line>
       ))}
 
-      {/* Animated Packet Stream Particles */}
+      {/* Animated Packet Stream Particles (Zero for blocked/tombstone links) */}
       <group ref={particleGroupRef}>
-        {linkLines.map((l, idx) => (
+        {activePacketLines.map((l, idx) => (
           <mesh key={`p-${idx}`}>
             <sphereGeometry args={[0.18, 8, 8]} />
             <meshBasicMaterial

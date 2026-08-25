@@ -16,34 +16,49 @@ const NodeMesh: React.FC<{
   onSelect: () => void
 }> = ({ node, isSelected, onSelect }) => {
   const meshRef = useRef<THREE.Mesh>(null)
+  const cageRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
 
   // Determine node color based on status
   const getColor = () => {
     switch (node.status) {
+      case 'ISOLATED':
+        return '#F43F5E' // Rose Red (802.1X Quarantine)
+      case 'BLOCKED_PERIMETER':
+        return '#EF4444' // Drop Red
+      case 'DECOMMISSIONED':
+        return '#F59E0B' // Amber Ghost Hologram
       case 'COMPROMISED':
-        return '#EF4444' // Red
+        return '#DC2626' // Deep Crimson
       case 'SUSPICIOUS':
-        return '#F59E0B' // Amber/Orange
+        return '#FB923C' // Orange
       case 'AI_FLAGGED':
         return '#A855F7' // Purple
       case 'HEALTHY':
       default:
-        return '#00F0FF' // Cyan
+        return '#00F0FF' // Cyber Cyan
     }
   }
 
   const nodeColor = getColor()
+  const isDecomm = node.status === 'DECOMMISSIONED'
+  const isIsolated = node.status === 'ISOLATED' || node.isIsolated
+  const isBlockedIp = node.status === 'BLOCKED_PERIMETER'
 
-  // Gentle floating and rotation animation
+  // Dynamic 3D rotation and floating animation
   useFrame((state, delta) => {
     if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.4
-      meshRef.current.rotation.x += delta * 0.2
-      if (node.status === 'COMPROMISED') {
-        const pulse = 1 + Math.sin(state.clock.elapsedTime * 6) * 0.15
+      meshRef.current.rotation.y += delta * (isDecomm ? 0.15 : 0.4)
+      meshRef.current.rotation.x += delta * (isDecomm ? 0.1 : 0.2)
+
+      if (node.status === 'COMPROMISED' || isIsolated) {
+        const pulse = 1 + Math.sin(state.clock.elapsedTime * 6) * 0.14
         meshRef.current.scale.set(pulse, pulse, pulse)
       }
+    }
+    if (cageRef.current) {
+      cageRef.current.rotation.y -= delta * 0.6
+      cageRef.current.rotation.z += delta * 0.3
     }
   })
 
@@ -66,6 +81,8 @@ const NodeMesh: React.FC<{
         return <boxGeometry args={[0.9, 0.6, 0.9]} />
       case 'iot':
         return <dodecahedronGeometry args={[0.6, 0]} />
+      case 'decommissioned':
+        return <dodecahedronGeometry args={[0.75, 0]} />
       default:
         return <sphereGeometry args={[0.7, 16, 16]} />
     }
@@ -73,7 +90,33 @@ const NodeMesh: React.FC<{
 
   return (
     <group position={node.position}>
-      {/* Outer Halo / Wireframe Ring if selected or high risk */}
+      {/* 1. Pulsing Quarantine Cage Shield for Isolated 802.1X Nodes */}
+      {isIsolated && (
+        <mesh ref={cageRef}>
+          <octahedronGeometry args={[1.7, 1]} />
+          <meshBasicMaterial
+            color="#F43F5E"
+            wireframe
+            transparent
+            opacity={0.5}
+          />
+        </mesh>
+      )}
+
+      {/* 2. Perimeter Firewall Drop Ring for Blocked Adversary IPs */}
+      {isBlockedIp && (
+        <mesh>
+          <ringGeometry args={[1.3, 1.6, 32]} />
+          <meshBasicMaterial
+            color="#EF4444"
+            side={THREE.DoubleSide}
+            transparent
+            opacity={0.4}
+          />
+        </mesh>
+      )}
+
+      {/* 3. Outer Halo / Wireframe Ring if selected or high risk */}
       {(isSelected || hovered || node.status === 'COMPROMISED') && (
         <mesh>
           <sphereGeometry args={[1.6, 16, 16]} />
@@ -81,12 +124,12 @@ const NodeMesh: React.FC<{
             color={nodeColor}
             wireframe
             transparent
-            opacity={node.status === 'COMPROMISED' ? 0.4 : 0.25}
+            opacity={node.status === 'COMPROMISED' ? 0.45 : 0.25}
           />
         </mesh>
       )}
 
-      {/* Main Node Solid Mesh */}
+      {/* 4. Main Node Solid Mesh */}
       <mesh
         ref={meshRef}
         onClick={(e) => {
@@ -98,38 +141,72 @@ const NodeMesh: React.FC<{
           setHovered(true)
         }}
         onPointerOut={() => setHovered(false)}
-        scale={hovered || isSelected ? 1.25 : 1}
       >
         {renderGeometry()}
         <meshStandardMaterial
           color={nodeColor}
           emissive={nodeColor}
-          emissiveIntensity={node.status === 'COMPROMISED' ? 0.8 : hovered || isSelected ? 0.6 : 0.3}
-          roughness={0.2}
-          metalness={0.8}
+          emissiveIntensity={isDecomm ? 0.2 : hovered || isSelected ? 0.9 : 0.45}
+          roughness={isDecomm ? 0.8 : 0.2}
+          metalness={isDecomm ? 0.1 : 0.8}
+          wireframe={isDecomm}
+          transparent={isDecomm}
+          opacity={isDecomm ? 0.45 : 1}
         />
       </mesh>
 
-      {/* 3D HTML Label */}
+      {/* 5. 3D Spatial Interactive Billboard Label */}
       <Html
-        position={[0, 1.5, 0]}
+        position={[0, 1.45, 0]}
         center
-        distanceFactor={22}
+        distanceFactor={18}
         className="pointer-events-none select-none"
       >
         <div
-          className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold backdrop-blur-md border transition-all whitespace-nowrap ${
-            isSelected || hovered
-              ? 'bg-slate-900/95 text-cyan-300 border-cyan-400 shadow-cyan-glow-sm scale-110'
+          className={`flex flex-col items-center gap-0.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-mono shadow-lg backdrop-blur-md transition-all duration-200 ${
+            isIsolated
+              ? 'bg-red-950/90 text-red-300 border border-red-500/70 shadow-neon-red/30'
+              : isBlockedIp
+              ? 'bg-red-950/90 text-red-300 border border-red-500/70 shadow-neon-red/30'
+              : isDecomm
+              ? 'bg-slate-950/80 text-amber-300/80 border border-amber-500/40 opacity-75'
               : node.status === 'COMPROMISED'
-              ? 'bg-red-950/90 text-red-200 border-red-500/80 shadow-red-glow-sm animate-pulse'
+              ? 'bg-red-950/90 text-red-200 border border-red-500 shadow-neon-red animate-pulse'
               : node.status === 'SUSPICIOUS'
-              ? 'bg-amber-950/80 text-amber-200 border-amber-500/60'
-              : 'bg-slate-950/80 text-slate-300 border-slate-700/60'
+              ? 'bg-amber-950/90 text-amber-200 border border-amber-500'
+              : isSelected
+              ? 'bg-cyan-950/90 text-cyan-200 border border-cyan-400 scale-110 shadow-neon-cyan'
+              : 'bg-slate-950/85 text-slate-200 border border-slate-700/60'
           }`}
         >
-          {node.id}
-          {node.status === 'COMPROMISED' && ' [94%]'}
+          <div className="flex items-center gap-1">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                isIsolated
+                  ? 'bg-red-400 animate-ping'
+                  : isBlockedIp
+                  ? 'bg-red-500'
+                  : isDecomm
+                  ? 'bg-amber-500'
+                  : node.status === 'COMPROMISED'
+                  ? 'bg-red-500 animate-ping'
+                  : node.status === 'SUSPICIOUS'
+                  ? 'bg-amber-400'
+                  : 'bg-cyan-400'
+              }`}
+            />
+            <span className="font-bold">{node.id}</span>
+          </div>
+
+          <span className="text-[9px] text-slate-400">
+            {isIsolated
+              ? '802.1X QUARANTINED'
+              : isBlockedIp
+              ? 'FW DROP PERIMETER'
+              : isDecomm
+              ? 'DECOMMISSIONED'
+              : node.ip}
+          </span>
         </div>
       </Html>
     </group>
