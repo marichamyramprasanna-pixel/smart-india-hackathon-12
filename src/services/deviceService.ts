@@ -7,7 +7,7 @@ import { Tables, InsertDto, UpdateDto } from '../types/database'
 
 // Validation Schemas using Zod
 export const deviceCreateSchema = z.object({
-  id: z.string().min(2, 'Device ID is required (e.g. DEVICE-042)'),
+  id: z.string().min(2, 'Device ID is required (e.g. DEVICE-001)'),
   hostname: z.string().min(2, 'Hostname is required'),
   ip_address: z.string().regex(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/, 'Must be a valid IPv4 address'),
   mac_address: z.string().optional().default('00:00:00:00:00:00'),
@@ -40,50 +40,7 @@ export interface DeletedDeviceRecord {
   lastRiskScore: number
 }
 
-const DEFAULT_DELETED_DEVICES: DeletedDeviceRecord[] = [
-  {
-    id: 'DEVICE-042',
-    hostname: 'Workstation-Fin (FIN-WS-042)',
-    ip: '192.168.1.42',
-    mac: '00:0C:29:4F:8A:21',
-    os: 'Windows 11 Enterprise',
-    type: 'Workstation',
-    department: 'Finance & Accounts',
-    owner: 'Marcus Vance',
-    deletedAt: new Date().toISOString(),
-    deletedBy: 'SOC Analyst (Initial Inventory Reset)',
-    reason: 'Cleared from active inventory to allow fresh custom asset registration',
-    lastRiskScore: 96,
-  },
-  {
-    id: 'SERVER-07',
-    hostname: 'DB-Core-Cluster-07 (DB-CORE-07)',
-    ip: '192.168.1.7',
-    mac: '00:50:56:C0:00:08',
-    os: 'Red Hat Enterprise Linux 9.2',
-    type: 'Server',
-    department: 'Core Infrastructure',
-    owner: 'Database Ops',
-    deletedAt: new Date().toISOString(),
-    deletedBy: 'SOC Analyst (Initial Inventory Reset)',
-    reason: 'Cleared from active inventory to allow fresh custom asset registration',
-    lastRiskScore: 88,
-  },
-  {
-    id: 'DEVICE-LEGACY-019',
-    hostname: 'Workstation-Legacy (FIN-WS-019)',
-    ip: '192.168.1.119',
-    mac: '00:0C:29:4F:19:AA',
-    os: 'Windows 7 Enterprise (EOL)',
-    type: 'Workstation',
-    department: 'Finance & Accounts',
-    owner: 'Decommissioned Fleet',
-    deletedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    deletedBy: 'SOC Lead Architect',
-    reason: 'End-of-Life OS retirement & hardware refresh cycle',
-    lastRiskScore: 24,
-  },
-]
+const DEFAULT_DELETED_DEVICES: DeletedDeviceRecord[] = []
 
 /**
  * Maps database Row to frontend DeviceTelemetry interface
@@ -125,7 +82,9 @@ const LOCAL_STORAGE_CLEARED_KEY = 'sentinelx_inventory_cleared'
 
 // Resilient In-Memory store
 let inMemoryDevices: DeviceTelemetry[] = []
-let inMemoryDeleted: DeletedDeviceRecord[] = DEFAULT_DELETED_DEVICES
+let inMemoryDeleted: DeletedDeviceRecord[] = []
+
+const LEGACY_IDS = new Set(['DEVICE-042', 'SERVER-07', 'FIN-WS-042', 'DEVICE-118', 'DEVICE-LEGACY-019', 'DB-CORE-07'])
 
 function isInventoryCleared(): boolean {
   try {
@@ -142,16 +101,20 @@ function getLocalDevices(): DeviceTelemetry[] {
     const raw = localStorage.getItem(LOCAL_STORAGE_DEVICES_KEY)
     if (raw !== null) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return parsed
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter((d) => !LEGACY_IDS.has(d.id))
+        return cleaned
+      }
     }
   } catch {}
-  return inMemoryDevices
+  return inMemoryDevices.filter((d) => !LEGACY_IDS.has(d.id))
 }
 
 function saveLocalDevices(devices: DeviceTelemetry[]) {
-  inMemoryDevices = devices
+  const cleaned = devices.filter((d) => !LEGACY_IDS.has(d.id))
+  inMemoryDevices = cleaned
   try {
-    localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, JSON.stringify(devices))
+    localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, JSON.stringify(cleaned))
   } catch {}
 }
 
@@ -159,19 +122,17 @@ export function getDeletedDevices(): DeletedDeviceRecord[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_KEY)
     const list: DeletedDeviceRecord[] = raw ? JSON.parse(raw) : inMemoryDeleted
-    const combinedMap = new Map<string, DeletedDeviceRecord>()
-    DEFAULT_DELETED_DEVICES.forEach((d) => combinedMap.set(d.id, d))
-    list.forEach((d) => combinedMap.set(d.id, d))
-    return Array.from(combinedMap.values())
+    return list.filter((d) => !LEGACY_IDS.has(d.id))
   } catch {
-    return inMemoryDeleted
+    return inMemoryDeleted.filter((d) => !LEGACY_IDS.has(d.id))
   }
 }
 
 export function saveDeletedDevices(list: DeletedDeviceRecord[]) {
-  inMemoryDeleted = list
+  const cleaned = list.filter((d) => !LEGACY_IDS.has(d.id))
+  inMemoryDeleted = cleaned
   try {
-    localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, JSON.stringify(list))
+    localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, JSON.stringify(cleaned))
   } catch {}
 }
 
@@ -215,7 +176,9 @@ export const deviceService = {
 
         if (error) throw error
         if (data && data.length > 0) {
-          baseDevices = (data as Tables<'devices'>[]).map(mapRowToDevice)
+          baseDevices = (data as Tables<'devices'>[])
+            .map(mapRowToDevice)
+            .filter((d) => !LEGACY_IDS.has(d.id))
         }
       } catch (err) {
         baseDevices = []
@@ -229,7 +192,7 @@ export const deviceService = {
     }
     localExtra.forEach((d) => combinedMap.set(d.id, d))
 
-    let filtered = Array.from(combinedMap.values())
+    let filtered = Array.from(combinedMap.values()).filter((d) => !LEGACY_IDS.has(d.id))
 
     if (options?.search) {
       const q = options.search.toLowerCase()
@@ -255,6 +218,7 @@ export const deviceService = {
    * READ: Fetch single device by ID
    */
   async getDeviceById(id: string): Promise<{ data: DeviceTelemetry | null; error: string | null }> {
+    if (LEGACY_IDS.has(id)) return { data: null, error: 'Device not found' }
     const local = getLocalDevices().find((d) => d.id.toLowerCase() === id.toLowerCase())
     if (local) return { data: local, error: null }
 
@@ -493,38 +457,18 @@ export const deviceService = {
   },
 
   /**
-   * DELETE ALL: Remove all active devices and move them all to the Tombstone Vault
+   * DELETE ALL: Remove all active devices and reset inventory cleanly
    */
   async deleteAllDevices(): Promise<{ success: boolean; count: number }> {
     const { data: allActive } = await deviceService.getDevices()
     const count = allActive.length
 
-    // Archive all current devices into Deleted store
-    const newDeletedRecords: DeletedDeviceRecord[] = allActive.map((d) => ({
-      id: d.id,
-      hostname: d.hostname,
-      ip: d.ip,
-      mac: d.mac || '00:00:00:00:00:00',
-      os: d.os || 'Enterprise OS',
-      type: d.type || 'Workstation',
-      department: d.department || 'General Fleet',
-      owner: d.owner || 'SOC Asset Pool',
-      deletedAt: new Date().toISOString(),
-      deletedBy: 'SOC Administrator (Batch Purge)',
-      reason: 'Batch fleet decommission & inventory reset',
-      lastRiskScore: d.riskScore || 0,
-    }))
-
-    const currentDeleted = getDeletedDevices()
-    const deletedMap = new Map<string, DeletedDeviceRecord>()
-    currentDeleted.forEach((d) => deletedMap.set(d.id, d))
-    newDeletedRecords.forEach((d) => deletedMap.set(d.id, d))
-    saveDeletedDevices(Array.from(deletedMap.values()))
-
-    // Empty local devices store and mark inventory as cleared
     saveLocalDevices([])
+    saveDeletedDevices([])
     try {
       localStorage.setItem(LOCAL_STORAGE_CLEARED_KEY, 'true')
+      localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, '[]')
+      localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, '[]')
     } catch {}
 
     if (isSupabaseReady()) {

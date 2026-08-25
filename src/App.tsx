@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from './context/ThemeContext'
@@ -26,6 +26,17 @@ import { SettingsPage } from './pages/SettingsPage'
 import { FaqLandingPage } from './pages/FaqLandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+
+// Auto-purge any stale legacy demo devices from client storage on startup
+if (typeof window !== 'undefined') {
+  try {
+    const raw = localStorage.getItem('sentinelx_local_devices')
+    if (raw && (raw.includes('DEVICE-042') || raw.includes('SERVER-07') || raw.includes('FIN-WS-042'))) {
+      localStorage.setItem('sentinelx_local_devices', '[]')
+      localStorage.setItem('sentinelx_inventory_cleared', 'true')
+    }
+  } catch {}
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,5 +86,3 @@ export const App: React.FC = () => {
     </QueryClientProvider>
   )
 }
-
-export default App
