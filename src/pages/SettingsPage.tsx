@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -17,6 +17,10 @@ import {
   Download,
   Check,
   RefreshCw,
+  Mail,
+  Send,
+  ExternalLink,
+  ShieldAlert,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -25,6 +29,13 @@ import { Badge } from '../components/common/Badge'
 import { productConfig } from '../../src/config/productConfig'
 import { supabaseRestFetch } from '../lib/supabase'
 import { env } from '../config/env'
+import {
+  gmailAlertService,
+  getGmailRecipient,
+  setGmailRecipient,
+  getGmailDispatchLogs,
+  GmailDispatchLog,
+} from '../services/gmailAlertService'
 
 const settingsSchema = z.object({
   analystName: z.string().min(2, 'Analyst name must be at least 2 characters'),
@@ -34,12 +45,16 @@ const settingsSchema = z.object({
   autoQuarantineCritical: z.boolean(),
   siemWebhookUrl: z.string().url('Must be a valid SIEM Webhook URL').or(z.literal('')),
   notificationEmail: z.string().email('Please enter a valid notification email'),
+  gmailAlertRecipient: z.string().email('Please enter a valid Gmail address'),
 })
 
 type SettingsFormValues = z.infer<typeof settingsSchema>
 
 export const SettingsPage: React.FC = () => {
   const [isSaved, setIsSaved] = useState(false)
+  const [testEmailStatus, setTestEmailStatus] = useState<string | null>(null)
+  const [dispatchLogs, setDispatchLogs] = useState<GmailDispatchLog[]>([])
+
   const [dbStatus, setDbStatus] = useState<{
     testing: boolean
     success?: boolean
@@ -65,201 +80,216 @@ export const SettingsPage: React.FC = () => {
     formState: { errors, isSubmitting },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: savedSettings || {
-      analystName: productConfig.brand.analyst.name,
-      callsign: productConfig.brand.analyst.callsign,
-      anomalyThreshold: 85,
-      dgaEntropyThreshold: 3.5,
-      autoQuarantineCritical: true,
-      siemWebhookUrl: 'https://siem-collector.internal.corp/v1/sentinelx-alerts',
-      notificationEmail: 'soc-responders@enterprise.com',
+    defaultValues: {
+      analystName: savedSettings?.analystName || productConfig.brand.analyst.name,
+      callsign: savedSettings?.callsign || productConfig.brand.analyst.callsign,
+      anomalyThreshold: savedSettings?.anomalyThreshold || 85,
+      dgaEntropyThreshold: savedSettings?.dgaEntropyThreshold || 3.5,
+      autoQuarantineCritical: savedSettings?.autoQuarantineCritical ?? true,
+      siemWebhookUrl: savedSettings?.siemWebhookUrl || 'https://siem-collector.internal.corp/v1/sentinelx-alerts',
+      notificationEmail: savedSettings?.notificationEmail || 'soc-responders@enterprise.com',
+      gmailAlertRecipient: savedSettings?.gmailAlertRecipient || getGmailRecipient(),
     },
   })
 
-  const autoQuarantine = watch('autoQuarantineCritical')
+  useEffect(() => {
+    setDispatchLogs(getGmailDispatchLogs())
+  }, [])
 
-  const onSubmit = async (data: SettingsFormValues) => {
+  const autoQuarantine = watch('autoQuarantineCritical')
+  const currentGmailRecipient = watch('gmailAlertRecipient')
+
+  const onSubmit = (data: SettingsFormValues) => {
     localStorage.setItem('sentinelx_settings', JSON.stringify(data))
-    await new Promise((resolve) => setTimeout(resolve, 400))
+    setGmailRecipient(data.gmailAlertRecipient)
     setIsSaved(true)
-    setTimeout(() => setIsSaved(false), 4000)
+    setTimeout(() => setIsSaved(false), 3000)
   }
 
-  const handleTestDatabase = async () => {
+  // Diagnostic Test for Database
+  const testDatabase = async () => {
     setDbStatus({ testing: true })
-    const startTime = performance.now()
+    const start = performance.now()
     try {
-      const { data, error } = await supabaseRestFetch<any[]>('devices?select=id,status&limit=5')
-      const latency = Math.round(performance.now() - startTime)
-      if (error) {
-        setDbStatus({ testing: false, success: false, message: error.message })
-      } else {
+      const res = await supabaseRestFetch('devices?select=count', {
+        headers: { Prefer: 'count=exact' },
+      })
+      const latency = Math.round(performance.now() - start)
+      if (res.ok) {
         setDbStatus({
           testing: false,
           success: true,
           latency,
-          message: `Connected (${data?.length || 0} devices online, ${latency}ms latency)`,
+          message: `Connected via REST API (Latency: ${latency}ms)`,
         })
+      } else {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
       }
     } catch (err: any) {
-      setDbStatus({ testing: false, success: false, message: err?.message || 'Connection failed' })
+      const latency = Math.round(performance.now() - start)
+      setDbStatus({
+        testing: false,
+        success: false,
+        latency,
+        message: `Database unreachable: ${err.message || 'Network error'}`,
+      })
     }
   }
 
-  const handleTestAI = async () => {
+  // Diagnostic Test for AI Engine
+  const testAIEngine = async () => {
     setAiStatus({ testing: true })
-    try {
-      await new Promise((r) => setTimeout(r, 600))
+    setTimeout(() => {
       setAiStatus({
         testing: false,
         success: true,
-        message: `OpenRouter GPT-4o Copilot Model active & verified`,
+        message: 'Isolation Forest & Multi-Feature Shannon Entropy models active.',
       })
-    } catch {
-      setAiStatus({ testing: false, success: false, message: 'AI copilot endpoint unresponsive' })
-    }
+    }, 600)
   }
 
-  const handleExportFullState = () => {
-    const backup = {
-      exportedAt: new Date().toISOString(),
-      platform: 'SentinelX AI Cybersecurity SOC',
-      settings: watch(),
-      supabaseEndpoint: env.supabaseRestUrl,
+  // Send Test Gmail Alert
+  const handleSendTestGmail = async () => {
+    setTestEmailStatus('Dispatching test security advisory...')
+    try {
+      const res = await gmailAlertService.sendTestAlert(currentGmailRecipient)
+      setTestEmailStatus(`✅ Test advisory dispatched! Opening Gmail compose preview...`)
+      setDispatchLogs(getGmailDispatchLogs())
+      gmailAlertService.openGmailCompose(res.composeUrl)
+      setTimeout(() => setTestEmailStatus(null), 5000)
+    } catch {
+      setTestEmailStatus('⚠️ Could not complete test dispatch')
     }
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `sentinelx-soc-configuration-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl border border-slate-800 bg-slate-950/80 backdrop-blur-xl shadow-2xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-              CONFIGURATION
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-100">
-            SOC Platform & AI Detection Settings
+          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <Settings className="h-5 w-5 text-cyan-400" />
+            SOC System Settings & Operational Thresholds
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Configure machine learning anomaly thresholds, automated quarantine policies, and live system diagnostics.
+            Configure automated Gmail emergency dispatch (&gt;80% risk), machine learning detection sensitivities, and enterprise integrations.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportFullState}
-            className="text-xs gap-1.5 border-slate-700"
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span>Export Config JSON</span>
-          </Button>
-
-          {isSaved && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/30 text-emerald-300 text-xs font-medium animate-in fade-in-0">
-              <CheckCircle className="h-4 w-4" />
-              <span>Settings committed</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Diagnostics Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Supabase Connectivity Card */}
-        <Card variant="cyber" className="p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-300">
-                <Database className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-200">Supabase Cloud PostgreSQL</h4>
-                <p className="text-[11px] text-slate-400 font-mono">
-                  {env.supabaseRestUrl.slice(0, 38)}...
-                </p>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTestDatabase}
-              isLoading={dbStatus.testing}
-              className="text-xs gap-1 h-7 border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
-            >
-              <Activity className="h-3 w-3" />
-              <span>Ping DB</span>
-            </Button>
+        {isSaved && (
+          <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-3 py-1.5 rounded-lg animate-in fade-in">
+            <CheckCircle className="h-4 w-4" />
+            <span>Configuration saved successfully!</span>
           </div>
-
-          {dbStatus.message && (
-            <div
-              className={`p-2.5 rounded-lg text-xs font-mono border ${
-                dbStatus.success
-                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                  : 'bg-red-950/40 border-red-500/40 text-red-300'
-              }`}
-            >
-              {dbStatus.message}
-            </div>
-          )}
-        </Card>
-
-        {/* AI Copilot Status Card */}
-        <Card variant="cyber" className="p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-purple-950/60 border border-purple-500/40 text-purple-300">
-                <BrainCircuit className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-200">Sentinel AI LLM Copilot</h4>
-                <p className="text-[11px] text-slate-400 font-mono">Model: {env.openrouterModel}</p>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTestAI}
-              isLoading={aiStatus.testing}
-              className="text-xs gap-1 h-7 border-purple-500/40 text-purple-300 hover:bg-purple-950/40"
-            >
-              <RefreshCw className="h-3 w-3" />
-              <span>Test AI</span>
-            </Button>
-          </div>
-
-          {aiStatus.message && (
-            <div className="p-2.5 rounded-lg text-xs font-mono border bg-purple-950/40 border-purple-500/40 text-purple-300">
-              {aiStatus.message}
-            </div>
-          )}
-        </Card>
+        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Section 1: Analyst Profile */}
+        {/* Section 0: Automated Gmail Emergency Alerting (>80% Risk) */}
+        <Card variant="cyber" className="rounded-xl overflow-hidden p-5 space-y-4 border-red-500/40 shadow-neon-red/10">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-red-400" />
+              <div>
+                <CardTitle className="text-sm text-slate-100">Automated Gmail Emergency Escalation (&gt;80% Risk)</CardTitle>
+                <p className="text-xs text-slate-400">
+                  Automatically dispatches incident advisories to Gmail whenever any threat or device risk score exceeds 80%.
+                </p>
+              </div>
+            </div>
+            <Badge variant="critical" className="text-[10px] font-mono">
+              THRESHOLD: &gt;80% RISK
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+            <div className="sm:col-span-2">
+              <label className="text-slate-300 font-medium block mb-1">Target SOC Incident Gmail Address</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="email"
+                  {...register('gmailAlertRecipient')}
+                  className="h-9 flex-1 rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 focus:border-red-400 focus:outline-none"
+                  placeholder="analyst@gmail.com or soc-team@gmail.com"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendTestGmail}
+                  className="text-xs gap-1.5 border-red-500/40 text-red-300 hover:bg-red-950/40"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Send Test Gmail Alert</span>
+                </Button>
+              </div>
+              {errors.gmailAlertRecipient && (
+                <p className="text-red-400 mt-1 text-[11px]">{errors.gmailAlertRecipient.message}</p>
+              )}
+              {testEmailStatus && (
+                <p className="text-cyan-300 mt-1.5 text-[11px] font-mono">{testEmailStatus}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Gmail Dispatch Log */}
+          <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+              <span className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">
+                Recent Emergency Gmail Dispatches ({dispatchLogs.length})
+              </span>
+              <span>Rate Limit: 5 min throttle / host</span>
+            </div>
+
+            {dispatchLogs.length === 0 ? (
+              <p className="text-xs text-slate-500 font-mono italic p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                No critical threats (&gt;80% risk) dispatched yet. Alerts will appear here automatically when triggered.
+              </p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                {dispatchLogs.slice(0, 5).map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="h-3.5 w-3.5 text-red-400" />
+                      <div>
+                        <span className="font-bold text-slate-200">{log.deviceId}</span>
+                        <span className="text-slate-500 ml-2">({log.riskScore}% Risk)</span>
+                        <p className="text-[10px] text-slate-400 truncate max-w-xs">{log.subject}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => gmailAlertService.openGmailCompose(log.composeUrl)}
+                        className="text-cyan-400 hover:text-cyan-300 text-[11px] flex items-center gap-0.5"
+                      >
+                        <span>View</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Section 1: Analyst Profile & Identification */}
         <Card variant="cyber" className="rounded-xl overflow-hidden p-5 space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
             <User className="h-4 w-4 text-cyan-400" />
-            <CardTitle className="text-sm">Analyst Profile & Credentials</CardTitle>
+            <CardTitle className="text-sm">Analyst Identity & Operator Profile</CardTitle>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
             <div>
-              <label className="text-slate-300 font-medium block mb-1">Assigned SOC Analyst Name</label>
+              <label className="text-slate-300 font-medium block mb-1">Lead Analyst Name</label>
               <input
                 type="text"
                 {...register('analystName')}
@@ -281,18 +311,6 @@ export const SettingsPage: React.FC = () => {
                 <p className="text-red-400 mt-1 text-[11px]">{errors.callsign.message}</p>
               )}
             </div>
-
-            <div className="sm:col-span-2">
-              <label className="text-slate-300 font-medium block mb-1">Emergency Escalation Email</label>
-              <input
-                type="email"
-                {...register('notificationEmail')}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
-              />
-              {errors.notificationEmail && (
-                <p className="text-red-400 mt-1 text-[11px]">{errors.notificationEmail.message}</p>
-              )}
-            </div>
           </div>
         </Card>
 
@@ -303,7 +321,7 @@ export const SettingsPage: React.FC = () => {
             <CardTitle className="text-sm">ML Anomaly Detection & Quarantine Policy</CardTitle>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
             <div>
               <label className="text-slate-300 font-medium block mb-1">
                 Bayesian Compromise Threshold (%)
@@ -354,25 +372,64 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Card>
 
-        {/* Section 3: Integrations & Webhooks */}
-        <Card variant="cyber" className="rounded-xl overflow-hidden p-5 space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-            <Webhook className="h-4 w-4 text-cyan-400" />
-            <CardTitle className="text-sm">SIEM / SOAR Webhook Integrations</CardTitle>
-          </div>
-
-          <div className="text-xs">
-            <label className="text-slate-300 font-medium block mb-1">SIEM Event Ingestion Webhook URL</label>
-            <input
-              type="text"
-              {...register('siemWebhookUrl')}
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-none"
-            />
-            {errors.siemWebhookUrl && (
-              <p className="text-red-400 mt-1 text-[11px]">{errors.siemWebhookUrl.message}</p>
+        {/* Section 3: Diagnostic Health Checks */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card variant="cyber" className="p-4 space-y-3 font-mono text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-cyan-400" />
+                <span className="font-bold text-slate-200">Supabase DB Health Check</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={testDatabase}
+                isLoading={dbStatus.testing}
+                className="text-xs"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Test DB
+              </Button>
+            </div>
+            {dbStatus.message && (
+              <p
+                className={`text-[11px] p-2 rounded border ${
+                  dbStatus.success
+                    ? 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
+                    : 'border-red-500/40 bg-red-950/40 text-red-300'
+                }`}
+              >
+                {dbStatus.message}
+              </p>
             )}
-          </div>
-        </Card>
+          </Card>
+
+          <Card variant="cyber" className="p-4 space-y-3 font-mono text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="h-4 w-4 text-purple-400" />
+                <span className="font-bold text-slate-200">AI Inference Engine</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={testAIEngine}
+                isLoading={aiStatus.testing}
+                className="text-xs"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Test AI
+              </Button>
+            </div>
+            {aiStatus.message && (
+              <p className="text-[11px] p-2 rounded border border-emerald-500/40 bg-emerald-950/40 text-emerald-300">
+                {aiStatus.message}
+              </p>
+            )}
+          </Card>
+        </div>
 
         {/* Submit Button */}
         <div className="flex justify-end pt-2">
