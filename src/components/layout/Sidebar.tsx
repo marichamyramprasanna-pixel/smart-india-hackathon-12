@@ -84,6 +84,19 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       color: 'hover:text-blue-300 hover:bg-blue-950/40 border-blue-500/30',
     },
     {
+      name: 'AI Anomaly Hub',
+      href: '/ai-analysis',
+      icon: <BrainCircuit className="h-4 w-4 text-purple-400" />,
+      color: 'hover:text-purple-300 hover:bg-purple-950/40 border-purple-500/30',
+    },
+    {
+      name: 'Sentinel AI Chat',
+      href: '/ai-chat',
+      icon: <Bot className="h-4 w-4 text-fuchsia-400" />,
+      color: 'hover:text-fuchsia-300 hover:bg-fuchsia-950/40 border-fuchsia-500/30',
+      badge: 'VOICE 🎙️',
+    },
+    {
       name: 'Blocked Devices',
       href: '/blocked-devices',
       icon: <ShieldBan className="h-4 w-4 text-rose-400" />,
@@ -96,19 +109,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       icon: <Archive className="h-4 w-4 text-amber-400" />,
       color: 'hover:text-amber-300 hover:bg-amber-950/40 border-amber-500/30',
       badge: 'ARCHIVE',
-    },
-    {
-      name: 'AI Anomaly Hub',
-      href: '/ai-analysis',
-      icon: <BrainCircuit className="h-4 w-4 text-purple-400" />,
-      color: 'hover:text-purple-300 hover:bg-purple-950/40 border-purple-500/30',
-    },
-    {
-      name: 'Sentinel AI Chat',
-      href: '/ai-chat',
-      icon: <Bot className="h-4 w-4 text-fuchsia-400" />,
-      color: 'hover:text-fuchsia-300 hover:bg-fuchsia-950/40 border-fuchsia-500/30',
-      badge: 'VOICE 🎙️',
     },
     {
       name: 'Gmail & PDF Dispatch',
