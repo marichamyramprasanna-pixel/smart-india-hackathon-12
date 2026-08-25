@@ -334,6 +334,7 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
           <Network2DFallback
             nodes={filteredNodes}
             links={links}
+            selectedNodeId={selectedNode?.id || null}
             onSelectNode={(node) => setSelectedNode(node)}
           />
         )}

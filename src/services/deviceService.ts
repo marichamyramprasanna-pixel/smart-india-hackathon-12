@@ -22,8 +22,8 @@ export const deviceCreateSchema = z.object({
 
 export const deviceUpdateSchema = deviceCreateSchema.partial()
 
-export type DeviceCreateInput = z.infer<typeof deviceCreateSchema>
-export type DeviceUpdateInput = z.infer<typeof deviceUpdateSchema>
+export type DeviceCreateInput = z.input<typeof deviceCreateSchema>
+export type DeviceUpdateInput = z.input<typeof deviceUpdateSchema>
 
 export interface DeletedDeviceRecord {
   id: string

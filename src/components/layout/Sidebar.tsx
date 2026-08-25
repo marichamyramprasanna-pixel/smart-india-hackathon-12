@@ -166,7 +166,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                   {productConfig.brand.name}
                 </span>
                 <span className="text-[10px] rounded bg-cyan-950 border border-cyan-500/40 px-1 py-0.2 text-cyan-400 font-mono">
-                  {productConfig.brand.code}
+                  {productConfig.brand.version || 'v2.4'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-mono">
@@ -236,7 +236,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           <div className="flex items-center gap-2.5 rounded-lg bg-slate-900/90 border border-slate-800/90 p-2">
             <div className="relative">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-cyan-400 font-bold text-xs">
-                {productConfig.brand.analyst.initials}
+                {productConfig.brand.analyst.name.split(' ').map((w) => w[0]).join('')}
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-slate-950" />
             </div>

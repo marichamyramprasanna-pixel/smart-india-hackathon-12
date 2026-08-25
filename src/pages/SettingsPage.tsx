@@ -115,7 +115,7 @@ export const SettingsPage: React.FC = () => {
         headers: { Prefer: 'count=exact' },
       })
       const latency = Math.round(performance.now() - start)
-      if (res.ok) {
+      if (!res.error) {
         setDbStatus({
           testing: false,
           success: true,
@@ -123,7 +123,7 @@ export const SettingsPage: React.FC = () => {
           message: `Connected via REST API (Latency: ${latency}ms)`,
         })
       } else {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+        throw res.error
       }
     } catch (err: any) {
       const latency = Math.round(performance.now() - start)

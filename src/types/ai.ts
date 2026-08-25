@@ -12,7 +12,7 @@ export interface AIChatMessage {
   suggestedActions?: {
     id: string
     label: string
-    actionType: 'navigate' | 'isolate_device' | 'block_ip' | 'generate_report' | 'filter_threats' | 'explain_anomaly'
+    actionType: 'navigate' | 'isolate_device' | 'block_ip' | 'generate_report' | 'filter_threats' | 'explain_anomaly' | 'delete_all' | 'quarantine' | 'restore_device' | string
     payload?: Record<string, unknown>
   }[]
   structuredInsight?: {
