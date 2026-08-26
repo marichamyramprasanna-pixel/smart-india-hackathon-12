@@ -4,6 +4,7 @@ import { handleSupabaseError } from '../lib/supabaseError'
 import { DeviceTelemetry } from '../types/device'
 import { env } from '../config/env'
 import { Tables, InsertDto, UpdateDto } from '../types/database'
+import { emitSystemAction } from './systemEventBus'
 
 // Validation Schemas using Zod
 export const deviceCreateSchema = z.object({
@@ -83,7 +84,7 @@ const LOCAL_STORAGE_CLEARED_KEY = 'sentinelx_inventory_cleared'
 // Resilient In-Memory store
 let inMemoryDevices: DeviceTelemetry[] = []
 let inMemoryDeleted: DeletedDeviceRecord[] = []
-let inMemoryCleared = true
+let inMemoryCleared = false
 
 const LEGACY_IDS = new Set(['DEVICE-042', 'SERVER-07', 'FIN-WS-042', 'DEVICE-118', 'DEVICE-LEGACY-019', 'DB-CORE-07'])
 
@@ -95,6 +96,251 @@ export function isInventoryCleared(): boolean {
   return inMemoryCleared
 }
 
+export const DEFAULT_SEED_DEVICES: DeviceTelemetry[] = [
+  {
+    id: 'DEVICE-101',
+    hostname: 'FIN-WORKSTATION-101',
+    ip: '10.0.1.101',
+    mac: '70:85:C2:A1:01:01',
+    os: 'Windows 11 Enterprise',
+    type: 'Workstation',
+    department: 'Finance & Operations',
+    owner: 'Sarah Connor',
+    status: 'HEALTHY',
+    riskScore: 12,
+    compromiseProbability: 8,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 142000,
+      outboundTrafficBytes: 98000,
+      dnsQueriesPerMin: 24,
+      failedLogins24h: 0,
+      activeConnections: 14,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'SERVER-99',
+    hostname: 'CORE-DB-CLUSTER-01',
+    ip: '10.0.2.99',
+    mac: '00:1A:2B:3C:4D:99',
+    os: 'Ubuntu 24.04 LTS Server',
+    type: 'Server',
+    department: 'DevOps & Data Platform',
+    owner: 'Infrastructure Core Team',
+    status: 'COMPROMISED',
+    riskScore: 88,
+    compromiseProbability: 85,
+    lastSeen: new Date().toISOString(),
+    anomalies: [
+      'Unusual outbound LDAP entropy spike (8.4 bits)',
+      'Potential Pass-the-Hash Kerberos ticket forgery detected',
+    ],
+    metrics: {
+      inboundTrafficBytes: 9400000,
+      outboundTrafficBytes: 14200000,
+      dnsQueriesPerMin: 450,
+      failedLogins24h: 28,
+      activeConnections: 184,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'FIREWALL-01',
+    hostname: 'EDGE-NGFW-PERIMETER',
+    ip: '10.0.0.1',
+    mac: 'AC:1A:70:99:88:01',
+    os: 'FortiOS v7.4 High Availability',
+    type: 'Firewall',
+    department: 'Network Operations (SOC)',
+    owner: 'SecOps Administrator',
+    status: 'HEALTHY',
+    riskScore: 5,
+    compromiseProbability: 2,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 48000000,
+      outboundTrafficBytes: 32000000,
+      dnsQueriesPerMin: 1200,
+      failedLogins24h: 0,
+      activeConnections: 890,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'IOT-GATEWAY-04',
+    hostname: 'SMART-BUILDING-HUB',
+    ip: '10.0.4.15',
+    mac: 'B8:27:EB:42:15:04',
+    os: 'Custom Embedded Linux (Yocto)',
+    type: 'IoT',
+    department: 'Smart Facilities',
+    owner: 'Facility Operations',
+    status: 'HEALTHY',
+    riskScore: 18,
+    compromiseProbability: 14,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 52000,
+      outboundTrafficBytes: 41000,
+      dnsQueriesPerMin: 8,
+      failedLogins24h: 1,
+      activeConnections: 4,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'LAPTOP-PRO-7',
+    hostname: 'EXEC-LAPTOP-ALPHA',
+    ip: '10.0.3.44',
+    mac: '88:66:55:44:33:22',
+    os: 'macOS Sequoia 15.1',
+    type: 'Laptop',
+    department: 'Executive Suite',
+    owner: 'Chief Information Security Officer',
+    status: 'SUSPICIOUS',
+    riskScore: 64,
+    compromiseProbability: 58,
+    lastSeen: new Date().toISOString(),
+    anomalies: ['High DNS DGA Query entropy to unregistered TLD .xyz'],
+    metrics: {
+      inboundTrafficBytes: 890000,
+      outboundTrafficBytes: 450000,
+      dnsQueriesPerMin: 140,
+      failedLogins24h: 3,
+      activeConnections: 35,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'CLOUD-K8S-01',
+    hostname: 'K8S-MICROSERVICES-CLUSTER',
+    ip: '10.0.5.88',
+    mac: '02:42:AC:11:00:88',
+    os: 'Alpine Linux (Containerd)',
+    type: 'Cloud',
+    department: 'Cloud Platform Engineering',
+    owner: 'DevOps Lead',
+    status: 'HEALTHY',
+    riskScore: 15,
+    compromiseProbability: 10,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 18400000,
+      outboundTrafficBytes: 12100000,
+      dnsQueriesPerMin: 680,
+      failedLogins24h: 0,
+      activeConnections: 412,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'PAYROLL-DB-02',
+    hostname: 'PAYROLL-VAULT-DB',
+    ip: '10.0.2.140',
+    mac: '00:50:56:A1:B2:C3',
+    os: 'RHEL 9.3 Enterprise Linux',
+    type: 'Server',
+    department: 'Human Resources & Finance',
+    owner: 'HR Systems Admin',
+    status: 'SUSPICIOUS',
+    riskScore: 58,
+    compromiseProbability: 50,
+    lastSeen: new Date().toISOString(),
+    anomalies: ['Unusual off-hours SQL query burst dumping 12,000 employee records'],
+    metrics: {
+      inboundTrafficBytes: 4200000,
+      outboundTrafficBytes: 8900000,
+      dnsQueriesPerMin: 180,
+      failedLogins24h: 7,
+      activeConnections: 95,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'AI-GPU-CLUSTER-03',
+    hostname: 'DEEP-LEARNING-NODE-03',
+    ip: '10.0.6.77',
+    mac: '00:25:90:77:88:99',
+    os: 'Ubuntu 24.04 LTS (NVIDIA DGX)',
+    type: 'Server',
+    department: 'AI & Data Research',
+    owner: 'Lead AI Researcher',
+    status: 'HEALTHY',
+    riskScore: 22,
+    compromiseProbability: 16,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 95000000,
+      outboundTrafficBytes: 62000000,
+      dnsQueriesPerMin: 320,
+      failedLogins24h: 1,
+      activeConnections: 180,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'ROUTER-CORE-05',
+    hostname: 'BACKBONE-CORE-ROUTER',
+    ip: '10.0.0.254',
+    mac: 'CC:D5:39:00:00:FE',
+    os: 'Cisco IOS-XE 17.9',
+    type: 'Router',
+    department: 'Network Operations',
+    owner: 'Lead Network Engineer',
+    status: 'HEALTHY',
+    riskScore: 2,
+    compromiseProbability: 1,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 120000000,
+      outboundTrafficBytes: 110000000,
+      dnsQueriesPerMin: 2100,
+      failedLogins24h: 0,
+      activeConnections: 1450,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+  {
+    id: 'DEVPANEL-WS-09',
+    hostname: 'DEV-STAGING-LAPTOP',
+    ip: '10.0.3.89',
+    mac: 'A4:83:E7:89:10:99',
+    os: 'macOS Sonoma 14.6',
+    type: 'Laptop',
+    department: 'Software Engineering',
+    owner: 'Senior Fullstack Engineer',
+    status: 'HEALTHY',
+    riskScore: 10,
+    compromiseProbability: 6,
+    lastSeen: new Date().toISOString(),
+    anomalies: [],
+    metrics: {
+      inboundTrafficBytes: 680000,
+      outboundTrafficBytes: 420000,
+      dnsQueriesPerMin: 55,
+      failedLogins24h: 0,
+      activeConnections: 28,
+    },
+    isolationStatus: { isIsolated: false },
+  },
+]
+
+export function seedSampleDevices(): DeviceTelemetry[] {
+  inMemoryCleared = false
+  saveLocalDevices(DEFAULT_SEED_DEVICES)
+  try {
+    localStorage.setItem(LOCAL_STORAGE_CLEARED_KEY, 'false')
+  } catch {}
+  return DEFAULT_SEED_DEVICES
+}
+
 function getLocalDevices(): DeviceTelemetry[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_DEVICES_KEY)
@@ -102,10 +348,16 @@ function getLocalDevices(): DeviceTelemetry[] {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         const cleaned = parsed.filter((d) => !LEGACY_IDS.has(d.id))
-        return cleaned
+        if (cleaned.length > 0) return cleaned
       }
     }
   } catch {}
+
+  // If local list is empty and inventory was not explicitly cleared, auto-seed defaults
+  if (!isInventoryCleared() && inMemoryDevices.length === 0) {
+    return seedSampleDevices()
+  }
+
   return inMemoryDevices.filter((d) => !LEGACY_IDS.has(d.id))
 }
 
@@ -314,6 +566,12 @@ export const deviceService = {
           .single()
 
         if (!error && data) {
+          emitSystemAction({
+            type: 'DEVICE_REGISTERED',
+            targetId: validData.id,
+            targetName: validData.hostname,
+            details: `${validData.device_type} in ${validData.department}`,
+          })
           return { data: mapRowToDevice(data as Tables<'devices'>), error: null }
         }
       } catch (err) {
@@ -321,6 +579,12 @@ export const deviceService = {
       }
     }
 
+    emitSystemAction({
+      type: 'DEVICE_REGISTERED',
+      targetId: validData.id,
+      targetName: validData.hostname,
+      details: `${validData.device_type} in ${validData.department}`,
+    })
     return { data: localNewDevice, error: null }
   },
 
@@ -446,6 +710,13 @@ export const deviceService = {
     const existingDeleted = getDeletedDevices().filter((d) => d.id !== id)
     saveDeletedDevices([deletedRecord, ...existingDeleted])
 
+    emitSystemAction({
+      type: 'DEVICE_DELETED',
+      targetId: id,
+      targetName: target.hostname,
+      details: reason,
+    })
+
     if (isSupabaseReady()) {
       try {
         await supabase.from('devices').delete().eq('id', id)
@@ -469,6 +740,12 @@ export const deviceService = {
       localStorage.setItem(LOCAL_STORAGE_DEVICES_KEY, '[]')
       localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, '[]')
     } catch {}
+
+    emitSystemAction({
+      type: 'ALL_DEVICES_DELETED',
+      targetId: 'ALL',
+      details: 'All active endpoints cleared & archived to Tombstone Vault',
+    })
 
     if (isSupabaseReady()) {
       try {
@@ -504,6 +781,12 @@ export const deviceService = {
     if (!res.error) {
       const remainingDeleted = getDeletedDevices().filter((d) => d.id !== deletedRecord.id)
       saveDeletedDevices(remainingDeleted)
+      emitSystemAction({
+        type: 'DEVICE_RESTORED',
+        targetId: deletedRecord.id,
+        targetName: deletedRecord.hostname,
+        details: 'Restored from tombstone vault back to active inventory',
+      })
       return { success: true, error: null }
     }
 

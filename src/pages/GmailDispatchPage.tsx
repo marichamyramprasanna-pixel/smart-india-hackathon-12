@@ -34,6 +34,8 @@ import {
   DEFAULT_TARGET_GMAIL,
   generateSecurityAdvisoryBody,
   buildGmailComposeUrl,
+  buildMailtoUrl,
+  sendDirectBackgroundEmail,
 } from '../services/gmailAlertService'
 import { ReportPreview } from '../components/reports/ReportPreview'
 import { defaultIncidentReport } from '../api/reports'
@@ -141,10 +143,22 @@ export const GmailDispatchPage: React.FC = () => {
     return buildGmailComposeUrl(recipient, subject, emailBodyText)
   }, [recipient, subject, emailBodyText])
 
+  const mailtoUrl = useMemo(() => {
+    return buildMailtoUrl(recipient, subject, emailBodyText)
+  }, [recipient, subject, emailBodyText])
+
   // Handle Send via Gmail Web App
-  const handleSendGmail = () => {
+  const handleSendGmail = async () => {
     setGmailRecipient(recipient)
-    gmailAlertService.openGmailCompose(composeUrl)
+
+    // Trigger direct background HTTP delivery
+    sendDirectBackgroundEmail(recipient, subject, emailBodyText)
+
+    const opened = gmailAlertService.openGmailCompose(composeUrl)
+    if (!opened) {
+      // Direct window open fallback
+      window.open(composeUrl, '_blank')
+    }
 
     // Save to audit logs
     const log: GmailDispatchLog = {
@@ -166,7 +180,20 @@ export const GmailDispatchPage: React.FC = () => {
 
     setDispatchedSuccess(true)
     confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } })
-    setTimeout(() => setDispatchedSuccess(false), 5000)
+    setTimeout(() => setDispatchedSuccess(false), 6000)
+  }
+
+  // Handle Send via Default OS Mail Client (mailto:)
+  const handleSendMailClient = () => {
+    setGmailRecipient(recipient)
+
+    // Trigger direct background HTTP delivery
+    sendDirectBackgroundEmail(recipient, subject, emailBodyText)
+
+    window.location.href = mailtoUrl
+    setDispatchedSuccess(true)
+    confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } })
+    setTimeout(() => setDispatchedSuccess(false), 6000)
   }
 
   // Handle Copy Formatted Email
@@ -345,7 +372,7 @@ export const GmailDispatchPage: React.FC = () => {
                 Dispatches pre-filled draft to <span className="text-cyan-300 font-bold">{recipient}</span>.
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="md"
@@ -354,6 +381,17 @@ export const GmailDispatchPage: React.FC = () => {
                 >
                   <Copy className="h-4 w-4" />
                   <span>Copy Text</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={handleSendMailClient}
+                  className="text-xs gap-1.5 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/40"
+                  title="Open in your default desktop email client (Outlook, Thunderbird, Apple Mail)"
+                >
+                  <Mail className="h-4 w-4" />
+                  <span>Default Mail App</span>
                 </Button>
 
                 <Button

@@ -33,12 +33,14 @@ interface NetworkTopologyCanvasProps {
   links: Network3DLink[]
   height?: string
   enableFullscreen?: boolean
+  packetSpeedMultiplier?: number
 }
 
 export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   nodes,
   links,
   height = 'h-[620px]',
+  packetSpeedMultiplier = 1.0,
 }) => {
   const navigate = useNavigate()
   const { currentStage } = useDemoScenario()
@@ -50,6 +52,12 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [autoRotate, setAutoRotate] = useState(true)
   const [cameraPreset, setCameraPreset] = useState<'overview' | 'threat' | 'top'>('overview')
+
+  // Real-time canvas render parameter controls
+  const [nodeScale, setNodeScale] = useState(1.0)
+  const [starfieldDensity, setStarfieldDensity] = useState(4000)
+  const [packetVelocity, setPacketVelocity] = useState(1.0)
+  const [showConfig, setShowConfig] = useState(false)
 
   // Sync node statuses dynamically with DemoScenario state
   const reactiveNodes = nodes.map((n) => {
@@ -205,6 +213,20 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
             <span className="hidden xl:inline text-[11px]">Auto Orbit</span>
           </button>
 
+          {/* display config slider toggle */}
+          <button
+            onClick={() => setShowConfig((prev) => !prev)}
+            className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+              showConfig
+                ? 'border-cyan-500/50 bg-cyan-950/60 text-cyan-300 shadow-neon-cyan/20'
+                : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Display Tweaks Settings Panel"
+          >
+            <Sliders className="h-3.5 w-3.5" />
+            <span className="hidden xl:inline text-[11px]">3D Sliders</span>
+          </button>
+
           {/* 3D vs 2D Switcher */}
           <div className="flex items-center rounded-lg bg-slate-900/90 border border-slate-800 p-0.5">
             <button
@@ -287,7 +309,7 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
               <Stars
                 radius={120}
                 depth={60}
-                count={4000}
+                count={starfieldDensity}
                 factor={4}
                 saturation={0.5}
                 fade
@@ -313,9 +335,14 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
                 nodes={filteredNodes}
                 selectedNodeId={selectedNode?.id || null}
                 onSelectNode={(node) => setSelectedNode(node)}
+                nodeScale={nodeScale}
               />
 
-              <PacketStreams nodes={reactiveNodes} links={links} />
+              <PacketStreams
+                nodes={reactiveNodes}
+                links={links}
+                velocityMultiplier={packetVelocity * packetSpeedMultiplier}
+              />
 
               {/* Orbit Controls with Smooth Damping & Auto-Rotation */}
               <OrbitControls
@@ -339,6 +366,80 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
           />
         )}
       </div>
+
+      {/* 3D Parameter Configuration Overlay Panel */}
+      {showConfig && viewMode === '3d' && (
+        <div className="absolute bottom-3 right-3 z-20 w-64 p-4 rounded-xl border border-cyan-500/40 bg-slate-950/90 backdrop-blur-md shadow-2xl space-y-3.5 text-xs font-mono animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+              <Sliders className="h-3.5 w-3.5" /> Display Tweaks
+            </span>
+            <button
+              onClick={() => {
+                setNodeScale(1.0)
+                setStarfieldDensity(4000)
+                setPacketVelocity(1.0)
+              }}
+              className="text-[10px] text-slate-500 hover:text-cyan-400 transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {/* Node scale slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">Node Scaling:</span>
+                <span className="text-cyan-300 font-bold">{nodeScale.toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="2.5"
+                step="0.1"
+                value={nodeScale}
+                onChange={(e) => setNodeScale(Number(e.target.value))}
+                className="w-full h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-400"
+              />
+            </div>
+
+            {/* Packet velocity slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">Stream Velocity:</span>
+                <span className="text-cyan-300 font-bold">{(packetVelocity * packetSpeedMultiplier).toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min="0.2"
+                max="3.0"
+                step="0.1"
+                value={packetVelocity}
+                onChange={(e) => setPacketVelocity(Number(e.target.value))}
+                className="w-full h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-400"
+              />
+            </div>
+
+            {/* Star density slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">Star Backdrop:</span>
+                <span className="text-cyan-300 font-bold">{starfieldDensity} Stars</span>
+              </div>
+              <input
+                type="range"
+                min="500"
+                max="8000"
+                step="500"
+                value={starfieldDensity}
+                onChange={(e) => setStarfieldDensity(Number(e.target.value))}
+                className="w-full h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-400"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Forensic Drawer for Selected 3D Node */}
       <NodeDetailsDrawer

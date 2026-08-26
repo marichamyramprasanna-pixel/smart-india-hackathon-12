@@ -8,13 +8,15 @@ interface NetworkNodesProps {
   nodes: Network3DNode[]
   selectedNodeId: string | null
   onSelectNode: (node: Network3DNode) => void
+  nodeScale?: number
 }
 
 const NodeMesh: React.FC<{
   node: Network3DNode
   isSelected: boolean
   onSelect: () => void
-}> = ({ node, isSelected, onSelect }) => {
+  nodeScale?: number
+}> = ({ node, isSelected, onSelect, nodeScale = 1.0 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const cageRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
@@ -52,8 +54,10 @@ const NodeMesh: React.FC<{
       meshRef.current.rotation.x += delta * (isDecomm ? 0.1 : 0.2)
 
       if (node.status === 'COMPROMISED' || isIsolated) {
-        const pulse = 1 + Math.sin(state.clock.elapsedTime * 6) * 0.14
+        const pulse = (1 + Math.sin(state.clock.elapsedTime * 6) * 0.14) * nodeScale
         meshRef.current.scale.set(pulse, pulse, pulse)
+      } else {
+        meshRef.current.scale.set(nodeScale, nodeScale, nodeScale)
       }
     }
     if (cageRef.current) {
@@ -217,6 +221,7 @@ export const NetworkNodes: React.FC<NetworkNodesProps> = ({
   nodes,
   selectedNodeId,
   onSelectNode,
+  nodeScale = 1.0,
 }) => {
   return (
     <group>
@@ -226,6 +231,7 @@ export const NetworkNodes: React.FC<NetworkNodesProps> = ({
           node={node}
           isSelected={selectedNodeId === node.id}
           onSelect={() => onSelectNode(node)}
+          nodeScale={nodeScale}
         />
       ))}
     </group>

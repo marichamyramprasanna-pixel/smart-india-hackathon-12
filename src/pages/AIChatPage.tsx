@@ -44,6 +44,51 @@ export const AIChatPage: React.FC = () => {
   const { devices } = useDevices()
   const { alerts } = useAlerts()
 
+  const [chatTheme, setChatTheme] = useState<'purple' | 'green' | 'cyan' | 'slate'>('purple')
+
+  const themeClasses = {
+    purple: {
+      banner: 'border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-950/90 to-slate-950/90 shadow-purple-glow',
+      avatarBg: 'bg-purple-900/60 border-purple-500/40 text-purple-300 shadow-purple-glow',
+      textAccent: 'text-purple-300',
+      badge: 'ai' as const,
+      borderAccent: 'focus:border-purple-400',
+      button: 'bg-purple-950/60 hover:bg-purple-900 border-purple-500/40 text-purple-300',
+      chatBg: 'border-slate-800 bg-slate-950/90 shadow-2xl',
+      insightBorder: 'border-purple-500/40 shadow-purple-glow-sm',
+    },
+    green: {
+      banner: 'border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-slate-950/90 to-slate-950/90 shadow-emerald-glow',
+      avatarBg: 'bg-emerald-900/60 border-emerald-500/40 text-emerald-300 shadow-emerald-glow',
+      textAccent: 'text-emerald-300',
+      badge: 'healthy' as const,
+      borderAccent: 'focus:border-emerald-400',
+      button: 'bg-emerald-950/60 hover:bg-emerald-900 border-emerald-500/40 text-emerald-300',
+      chatBg: 'border-slate-800 bg-slate-950/90 shadow-2xl',
+      insightBorder: 'border-emerald-500/40 shadow-emerald-glow-sm',
+    },
+    cyan: {
+      banner: 'border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-slate-950/90 to-slate-950/90 shadow-cyan-glow',
+      avatarBg: 'bg-cyan-900/60 border-cyan-500/40 text-cyan-300 shadow-cyan-glow',
+      textAccent: 'text-cyan-300',
+      badge: 'ai' as const,
+      borderAccent: 'focus:border-cyan-400',
+      button: 'bg-cyan-950/60 hover:bg-cyan-900 border-cyan-500/40 text-cyan-300',
+      chatBg: 'border-slate-800 bg-slate-950/90 shadow-2xl',
+      insightBorder: 'border-cyan-500/40 shadow-cyan-glow-sm',
+    },
+    slate: {
+      banner: 'border-slate-800 bg-gradient-to-r from-slate-900 via-slate-950 to-slate-950 shadow-slate-glow',
+      avatarBg: 'bg-slate-850 border-slate-750 text-slate-300 shadow-slate-glow',
+      textAccent: 'text-slate-300',
+      badge: 'ai' as const,
+      borderAccent: 'focus:border-slate-400',
+      button: 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300',
+      chatBg: 'border-slate-800 bg-slate-950/90 shadow-2xl',
+      insightBorder: 'border-slate-800 shadow-slate-glow-sm',
+    },
+  }
+
   // Dynamically detect highest-risk device from live inventory
   const compromised = devices.filter((d) => d.status === 'COMPROMISED')
   const suspicious = devices.filter((d) => d.status === 'SUSPICIOUS')
@@ -209,9 +254,9 @@ export const AIChatPage: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* Top Banner Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-950/90 to-slate-950/90 backdrop-blur-2xl shadow-purple-glow">
+      <div className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 p-5 rounded-2xl border transition-all duration-300 backdrop-blur-2xl ${themeClasses[chatTheme].banner}`}>
         <div className="flex items-center gap-3.5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white shadow-purple-glow shrink-0">
+          <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-white shrink-0 transition-all duration-300 ${themeClasses[chatTheme].avatarBg}`}>
             <BrainCircuit className="h-6 w-6" />
           </div>
           <div>
@@ -219,18 +264,35 @@ export const AIChatPage: React.FC = () => {
               <h1 className="text-lg sm:text-xl font-display font-bold text-slate-100">
                 Sentinel AI — Security Analyst Copilot Workspace
               </h1>
-              <Badge variant="ai" className="text-[10px] font-mono">
+              <Badge variant={themeClasses[chatTheme].badge} className="text-[10px] font-mono">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
                 VOICE ASSISTANT ONLINE
               </Badge>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Voice-enabled cybersecurity assistant trained on multivariate network baselines, IoC telemetry, and MITRE ATT&CK tactics.
+              Voice-enabled cybersecurity assistant trained on network baselines, IoC telemetry, and MITRE ATT&CK tactics.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Custom Theme Switcher */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-0.5 rounded-lg text-xs mr-2">
+            {(['purple', 'green', 'cyan', 'slate'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setChatTheme(t)}
+                className={`px-2 py-1 rounded text-[10px] uppercase font-bold transition-all ${
+                  chatTheme === t
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-neon-cyan/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t === 'purple' ? 'Purple' : t === 'green' ? 'Matrix' : t === 'cyan' ? 'Cyan' : 'Slate'}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={toggleAutoSpeak}
             className={`px-3 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-all ${
@@ -445,9 +507,30 @@ export const AIChatPage: React.FC = () => {
             })}
 
             {isLoading && (
-              <div className="flex gap-3 items-center text-xs text-purple-300 bg-purple-950/30 p-3.5 rounded-xl border border-purple-500/30">
-                <BrainCircuit className="h-5 w-5 animate-spin text-purple-400" />
-                <span className="font-mono">Sentinel AI is computing multi-dimensional Bayesian anomaly correlations...</span>
+              <div className={`flex gap-3 items-center text-xs p-3.5 rounded-xl border transition-all duration-300 ${
+                chatTheme === 'purple' ? 'text-purple-300 bg-purple-950/30 border-purple-500/30' :
+                chatTheme === 'green' ? 'text-emerald-300 bg-emerald-950/30 border-emerald-500/30' :
+                chatTheme === 'cyan' ? 'text-cyan-300 bg-cyan-950/30 border-cyan-500/30' :
+                'text-slate-300 bg-slate-900/60 border-slate-800'
+              }`}>
+                <div className="flex space-x-1.5 items-center py-1">
+                  <div className={`h-2.5 w-2.5 rounded-full animate-bounce ${
+                    chatTheme === 'purple' ? 'bg-purple-400' :
+                    chatTheme === 'green' ? 'bg-emerald-400' :
+                    chatTheme === 'cyan' ? 'bg-cyan-400' : 'bg-slate-400'
+                  }`} style={{ animationDelay: '0ms' }} />
+                  <div className={`h-2.5 w-2.5 rounded-full animate-bounce ${
+                    chatTheme === 'purple' ? 'bg-purple-400' :
+                    chatTheme === 'green' ? 'bg-emerald-400' :
+                    chatTheme === 'cyan' ? 'bg-cyan-400' : 'bg-slate-400'
+                  }`} style={{ animationDelay: '150ms' }} />
+                  <div className={`h-2.5 w-2.5 rounded-full animate-bounce ${
+                    chatTheme === 'purple' ? 'bg-purple-400' :
+                    chatTheme === 'green' ? 'bg-emerald-400' :
+                    chatTheme === 'cyan' ? 'bg-cyan-400' : 'bg-slate-400'
+                  }`} style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="font-mono ml-2">Sentinel AI is correlating threat patterns...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -496,15 +579,23 @@ export const AIChatPage: React.FC = () => {
               className={`flex-1 h-10 rounded-xl border bg-slate-950 px-4 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none ${
                 isListening
                   ? 'border-rose-500/60 ring-1 ring-rose-500/40 text-rose-200'
-                  : 'border-slate-700 focus:border-purple-400'
+                  : `border-slate-700 ${themeClasses[chatTheme].borderAccent}`
               }`}
             />
             <Button
-              variant="ai"
+              variant={
+                chatTheme === 'purple' ? 'ai' :
+                chatTheme === 'green' ? 'cyber' :
+                chatTheme === 'cyan' ? 'primary' : 'secondary'
+              }
               size="md"
               type="submit"
               disabled={!inputVal.trim() || isLoading}
-              className="h-10 px-5 text-xs font-semibold gap-1.5 shadow-purple-glow"
+              className={`h-10 px-5 text-xs font-semibold gap-1.5 ${
+                chatTheme === 'purple' ? 'shadow-purple-glow' :
+                chatTheme === 'green' ? 'shadow-neon-emerald/20' :
+                chatTheme === 'cyan' ? 'shadow-cyan-glow-sm' : ''
+              }`}
             >
               <span>Send</span>
               <Send className="h-3.5 w-3.5" />

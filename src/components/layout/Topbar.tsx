@@ -5,12 +5,14 @@ import {
   Bell,
   Menu,
   Shield,
+  ShieldCheck,
   Activity,
   Zap,
   Database,
   User,
   LogOut,
   LogIn,
+  Lock,
 } from 'lucide-react'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
 import { useSentinelAI } from '../../context/SentinelAIContext'
@@ -24,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '../common/DropdownMenu'
 import { NotificationCenter } from './NotificationCenter'
+import { SecurityPostureModal } from '../security/SecurityPostureModal'
 
 interface TopbarProps {
   onOpenSidebar: () => void
@@ -39,6 +42,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   const { toggleOpen, isOpen: isAiChatOpen } = useSentinelAI()
   const { user, profile, isAuthenticated, isSupabaseConnected, signOut } = useAuth()
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false)
+
+  const handleLockConsole = () => {
+    window.dispatchEvent(new CustomEvent('sentinelx_lock_console'))
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-slate-800/80 bg-slate-950/80 px-4 backdrop-blur-xl">
@@ -46,8 +54,9 @@ export const Topbar: React.FC<TopbarProps> = ({
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenSidebar}
-          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-850 hover:text-slate-200 lg:hidden"
-          aria-label="Open Navigation"
+          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-850 hover:text-slate-200 transition-colors"
+          aria-label="Toggle Navigation Sidebar Menu"
+          title="Toggle Navigation Sidebar Menu"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -67,8 +76,18 @@ export const Topbar: React.FC<TopbarProps> = ({
         </button>
       </div>
 
-      {/* Right Section: Status Pills, Supabase Badge, Sentinel AI, Notifications, Profile */}
+      {/* Right Section: Status Pills, Supabase Badge, Security Posture, Sentinel AI, Notifications, Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Zero-Trust Security Posture Inspector Trigger */}
+        <button
+          onClick={() => setIsSecurityModalOpen(true)}
+          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border bg-cyan-950/40 border-cyan-500/40 text-cyan-300 hover:bg-cyan-900/50 shadow-cyan-glow-sm transition-all"
+          title="Inspect Zero-Trust Platform Security & SHA-256 Ledger"
+        >
+          <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" />
+          <span>Zero-Trust: Grade A+</span>
+        </button>
+
         {/* Supabase Connection Status Badge */}
         <div
           className={`hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border ${
@@ -139,6 +158,19 @@ export const Topbar: React.FC<TopbarProps> = ({
               <p className="text-xs font-bold text-slate-100">{profile?.fullName || user?.email || productConfig.brand.analyst.name}</p>
               <p className="text-[10px] font-mono text-cyan-400">{profile?.callsign || productConfig.brand.analyst.callsign} • {profile?.clearanceLevel || productConfig.brand.analyst.clearanceLevel}</p>
             </div>
+
+            {/* Lock Console Action */}
+            <DropdownMenuItem onClick={handleLockConsole} className="gap-2 text-xs text-amber-300 hover:text-amber-200">
+              <Lock className="h-3.5 w-3.5 text-amber-400" />
+              <span>Lock SOC Console</span>
+            </DropdownMenuItem>
+
+            {/* Security Posture Inspector */}
+            <DropdownMenuItem onClick={() => setIsSecurityModalOpen(true)} className="gap-2 text-xs text-cyan-300 hover:text-cyan-200">
+              <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" />
+              <span>Security Posture (Grade A+)</span>
+            </DropdownMenuItem>
+
             {isAuthenticated ? (
               <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-xs text-red-300 hover:text-red-200">
                 <LogOut className="h-3.5 w-3.5" />
@@ -153,6 +185,12 @@ export const Topbar: React.FC<TopbarProps> = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Zero-Trust Security Posture Modal */}
+      <SecurityPostureModal
+        isOpen={isSecurityModalOpen}
+        onClose={() => setIsSecurityModalOpen(false)}
+      />
     </header>
   )
 }

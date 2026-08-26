@@ -28,13 +28,14 @@ import { FaqLandingPage } from './pages/FaqLandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
-// Auto-purge any stale legacy demo devices from client storage on startup
+import { seedSampleDevices } from './services/deviceService'
+
+// Auto-seed active device inventory on startup if empty or legacy IDs present
 if (typeof window !== 'undefined') {
   try {
     const raw = localStorage.getItem('sentinelx_local_devices')
-    if (raw && (raw.includes('DEVICE-042') || raw.includes('SERVER-07') || raw.includes('FIN-WS-042'))) {
-      localStorage.setItem('sentinelx_local_devices', '[]')
-      localStorage.setItem('sentinelx_inventory_cleared', 'true')
+    if (!raw || raw === '[]' || raw.includes('DEVICE-042') || raw.includes('SERVER-07') || raw.includes('FIN-WS-042')) {
+      seedSampleDevices()
     }
   } catch {}
 }

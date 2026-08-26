@@ -8,6 +8,7 @@ import { Button } from '../components/common/Button'
 import { FileText, Download, Printer, RefreshCw, CheckCircle, Sparkles } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card'
 import confetti from 'canvas-confetti'
+import { exportThreatsToSTIX21 } from '../services/stixExporter'
 
 export const ReportsPage: React.FC = () => {
   const { devices } = useDevices()
@@ -125,9 +126,12 @@ export const ReportsPage: React.FC = () => {
     window.print()
   }
 
-  // Derive live stats for header display
   const compromisedCount = devices.filter((d) => d.status === 'COMPROMISED').length
   const activeAlertCount = alerts.filter((a) => a.status === 'NEW' || a.status === 'INVESTIGATING').length
+
+  const handleExportSTIX = () => {
+    exportThreatsToSTIX21(alerts)
+  }
 
   return (
     <div className="space-y-6">
@@ -174,6 +178,7 @@ export const ReportsPage: React.FC = () => {
         report={report}
         onExportJson={handleExportJson}
         onPrint={handlePrint}
+        onExportSTIX={handleExportSTIX}
       />
     </div>
   )

@@ -12,6 +12,8 @@ import {
   Check,
   RefreshCw,
   Zap,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card'
 import { Button } from '../common/Button'
@@ -28,8 +30,10 @@ export const SecureIngestionConsole: React.FC = () => {
   const { refetch: refetchDevices } = useDevices()
   const { refetch: refetchAlerts } = useAlerts()
 
-  const [secretKey, setSecretKey] = useState('sentinelx_enterprise_hmac_secret_2026')
-  const [signature, setSignature] = useState('hmac-sha256-a9b8c7d6e5f43210')
+  const [secretKey, setSecretKey] = useState('••••••••••••••••••••••••••••••••')
+  const [signature, setSignature] = useState('••••••••••••••••••••••••••••••••')
+  const [showSecret, setShowSecret] = useState(false)
+  const [showSignature, setShowSignature] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [response, setResponse] = useState<IngestionResponse | null>(null)
   const [copied, setCopied] = useState(false)
@@ -38,9 +42,9 @@ export const SecureIngestionConsole: React.FC = () => {
     sensorId: 'SENSOR-VLAN-04',
     timestamp: new Date().toISOString(),
     nonce: `NONCE-${Math.random().toString(36).substring(2, 10)}`,
-    deviceId: 'DEVICE-042',
-    hostname: 'FIN-WS-042.internal.corp',
-    ipAddress: '10.0.4.42',
+    deviceId: 'DEV-SRV-01',
+    hostname: 'SRV-DATA-01.internal.corp',
+    ipAddress: '10.0.1.15',
     macAddress: '00:1A:2B:3C:4D:5E',
     metrics: {
       outboundBytes: 4800000000,
@@ -106,9 +110,9 @@ export const SecureIngestionConsole: React.FC = () => {
 
   const handleCopyCurl = () => {
     const curl = `curl -X POST https://cgkdtqtrbkrcmymzvuaa.supabase.co/rest/v1/devices \\
-  -H "apikey: sb_publishable_vpI3rBVolg6-h1KTcUAjbQ_fM59c454" \\
-  -H "Authorization: Bearer sb_publishable_vpI3rBVolg6-h1KTcUAjbQ_fM59c454" \\
-  -H "X-SentinelX-Signature: ${signature}" \\
+  -H "apikey: [PROTECTED_API_KEY]" \\
+  -H "Authorization: Bearer [PROTECTED_AUTH_BEARER_TOKEN]" \\
+  -H "X-SentinelX-Signature: [PROTECTED_HMAC_SIGNATURE]" \\
   -H "Content-Type: application/json" \\
   -d '${jsonText.replace(/\n/g, '').replace(/\s+/g, ' ')}'`
 
@@ -156,27 +160,45 @@ export const SecureIngestionConsole: React.FC = () => {
           <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-mono text-slate-400">X-SentinelX-Signature (HMAC-SHA256):</span>
-              <span className="text-[10px] text-cyan-400 font-mono">Protected</span>
+              <button
+                type="button"
+                onClick={() => setShowSignature((prev) => !prev)}
+                className="text-[10px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1"
+              >
+                {showSignature ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                <span>{showSignature ? 'Hide' : 'Reveal'}</span>
+              </button>
             </div>
-            <input
-              type="text"
-              value={signature}
-              onChange={(e) => setSignature(e.target.value)}
-              className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 text-xs text-cyan-300 font-mono focus:border-cyan-400 focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                type={showSignature ? 'text' : 'password'}
+                value={signature}
+                onChange={(e) => setSignature(e.target.value)}
+                className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 text-xs text-cyan-300 font-mono focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-mono text-slate-400">Shared Ingestion Secret Key:</span>
-              <span className="text-[10px] text-purple-400 font-mono">256-Bit</span>
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="text-[10px] text-purple-400 hover:text-purple-300 font-mono flex items-center gap-1"
+              >
+                {showSecret ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                <span>{showSecret ? 'Hide' : 'Reveal'}</span>
+              </button>
             </div>
-            <input
-              type="password"
-              value={secretKey}
-              onChange={(e) => setSecretKey(e.target.value)}
-              className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 text-xs text-purple-300 font-mono focus:border-cyan-400 focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                type={showSecret ? 'text' : 'password'}
+                value={secretKey}
+                onChange={(e) => setSecretKey(e.target.value)}
+                className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 text-xs text-purple-300 font-mono focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 

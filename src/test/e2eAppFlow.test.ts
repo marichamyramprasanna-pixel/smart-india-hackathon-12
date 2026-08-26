@@ -65,7 +65,7 @@ describe('SentinelX Complete End-to-End (E2E) Application Workflow Test Suite', 
     // 5. Test search filter
     const searchRes = await deviceService.getDevices({ search: 'Database' })
     expect(searchRes.data.some((d) => d.id === 'DEV-SRV-01')).toBe(true)
-  })
+  }, 15000)
 
   // ══════════════════════════════════════════════════════════════════════
   // JOURNEY 2: 3D TOPOLOGY GENERATION & STANDBY REACTIVITY

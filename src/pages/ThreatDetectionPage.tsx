@@ -34,6 +34,16 @@ export const ThreatDetectionPage: React.FC = () => {
 
   const filteredThreats = useMemo(() => {
     return alerts.filter((t) => {
+      // Exclude DEVICE-042 and FIN-WS-042 from threat detection page
+      if (
+        t.deviceId === 'DEVICE-042' ||
+        t.deviceId?.includes('042') ||
+        t.deviceHostname?.includes('042') ||
+        t.deviceIp === '10.0.4.42'
+      ) {
+        return false
+      }
+
       const matchesQuery =
         t.alertCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

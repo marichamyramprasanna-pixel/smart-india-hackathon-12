@@ -29,7 +29,7 @@ export const ThreatTable: React.FC<ThreatTableProps> = ({ threats, onSelectThrea
   const navigate = useNavigate()
   const { toggleOpen, sendMessage, setCurrentContext } = useSentinelAI()
   const { blockIp, isIpBlocked } = useInvestigation()
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({ 'AL-2041': true })
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
   const [sortField, setSortField] = useState<keyof ThreatAlert>('confidenceScore')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
@@ -91,7 +91,7 @@ export const ThreatTable: React.FC<ThreatTableProps> = ({ threats, onSelectThrea
                   <React.Fragment key={threat.id}>
                     <tr
                       onClick={() => onSelectThreat ? onSelectThreat(threat) : navigate(`/devices/${threat.deviceId}`)}
-                      className={`hover:bg-slate-850/60 transition-colors cursor-pointer group ${
+                      className={`hover:bg-slate-850/70 hover:scale-[1.005] hover:shadow-cyan-glow-sm transition-all duration-300 cursor-pointer group transform origin-center ${
                         isCritical ? 'bg-red-950/10' : ''
                       }`}
                     >

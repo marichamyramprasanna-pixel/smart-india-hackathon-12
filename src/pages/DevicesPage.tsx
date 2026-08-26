@@ -30,8 +30,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DeviceCollectorModal } from '../components/device/DeviceCollectorModal'
 import { useDevices } from '../hooks/useDevices'
 import { useInvestigation } from '../context/InvestigationContext'
-import { deviceCreateSchema, DeviceCreateInput } from '../services/deviceService'
+import { deviceCreateSchema, DeviceCreateInput, seedSampleDevices } from '../services/deviceService'
 import { DeviceTelemetry } from '../types/device'
+import { cyberAudioService } from '../services/cyberAudioService'
 
 export const DevicesPage: React.FC = () => {
   const navigate = useNavigate()
@@ -104,6 +105,7 @@ export const DevicesPage: React.FC = () => {
       await createDevice(data)
       setIsAddModalOpen(false)
       reset()
+      cyberAudioService.playRestore()
       setToastNotice(`Successfully registered ${data.hostname} (${data.id}) to inventory!`)
       setTimeout(() => setToastNotice(null), 3500)
     } catch (err: any) {
@@ -141,6 +143,7 @@ export const DevicesPage: React.FC = () => {
     if (!deviceToDelete) return
     try {
       await deleteDevice(deviceToDelete.id)
+      cyberAudioService.playQuarantine()
       setToastNotice(`Device ${deviceToDelete.hostname} deleted & moved to Deleted Devices Archive.`)
       setDeviceToDelete(null)
       setTimeout(() => setToastNotice(null), 3500)
@@ -152,6 +155,7 @@ export const DevicesPage: React.FC = () => {
   const handleConfirmClearAll = async () => {
     try {
       const count = await deleteAllDevices()
+      cyberAudioService.playAlarm()
       setIsClearAllModalOpen(false)
       setToastNotice(`Cleared all ${count} devices from inventory! All records archived to Deleted Devices Vault.`)
       setTimeout(() => setToastNotice(null), 4000)
@@ -310,16 +314,31 @@ export const DevicesPage: React.FC = () => {
               No active devices in current view. You can now register your own brand new custom endpoints, scan subnets, or view previously archived devices.
             </p>
           </div>
-          <div className="flex items-center justify-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                seedSampleDevices()
+                cyberAudioService.playRestore()
+                refetch()
+              }}
               className="text-xs font-semibold gap-1.5 shadow-neon-cyan/40"
             >
-              <Plus className="h-4 w-4" />
-              <span>Register New Endpoint</span>
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>Seed Sample Fleet (10 Endpoints)</span>
             </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddModalOpen(true)}
+              className="text-xs gap-1.5 border-slate-700"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Register Custom Endpoint</span>
+            </Button>
+
             <Button
               variant="outline"
               size="sm"

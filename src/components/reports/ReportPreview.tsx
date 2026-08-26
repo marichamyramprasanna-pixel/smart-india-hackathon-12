@@ -16,12 +16,14 @@ interface ReportPreviewProps {
   report: IncidentReport
   onExportJson: () => void
   onPrint: () => void
+  onExportSTIX?: () => void
 }
 
 export const ReportPreview: React.FC<ReportPreviewProps> = ({
   report,
   onExportJson,
   onPrint,
+  onExportSTIX,
 }) => {
   return (
     <div className="space-y-6">
@@ -33,6 +35,12 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onExportSTIX && (
+            <Button variant="outline" size="sm" onClick={onExportSTIX} className="text-xs gap-1.5 border-purple-500/40 hover:bg-purple-950/20 text-purple-300">
+              <ShieldAlert className="h-3.5 w-3.5" />
+              <span>Export STIX 2.1</span>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={onExportJson} className="text-xs gap-1.5">
             <Download className="h-3.5 w-3.5" />
             <span>Export JSON</span>

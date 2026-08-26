@@ -88,7 +88,26 @@ export const alertService = {
       if (error) throw error
 
       if (!data || data.length === 0) {
-        return { data: [], error: null }
+        let filtered = [...demoThreats]
+        if (filters?.severity && filters.severity !== 'ALL') {
+          filtered = filtered.filter((t) => t.severity === filters.severity)
+        }
+        if (filters?.status && filters.status !== 'ALL') {
+          filtered = filtered.filter((t) => t.status === filters.status)
+        }
+        if (filters?.deviceId) {
+          filtered = filtered.filter((t) => t.deviceId === filters.deviceId)
+        }
+        if (filters?.search) {
+          const q = filters.search.toLowerCase()
+          filtered = filtered.filter(
+            (t) =>
+              t.alertCode.toLowerCase().includes(q) ||
+              t.title.toLowerCase().includes(q) ||
+              t.deviceId.toLowerCase().includes(q)
+          )
+        }
+        return { data: filtered, error: null }
       }
 
       return { data: (data as Tables<'threat_alerts'>[]).map(mapRowToAlert), error: null }

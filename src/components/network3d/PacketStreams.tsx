@@ -6,9 +6,14 @@ import { Network3DNode, Network3DLink } from '../../types/network'
 interface PacketStreamsProps {
   nodes: Network3DNode[]
   links: Network3DLink[]
+  velocityMultiplier?: number
 }
 
-export const PacketStreams: React.FC<PacketStreamsProps> = ({ nodes, links }) => {
+export const PacketStreams: React.FC<PacketStreamsProps> = ({
+  nodes,
+  links,
+  velocityMultiplier = 1.0,
+}) => {
   const particleGroupRef = useRef<THREE.Group>(null)
 
   // Map nodes to coordinates lookup
@@ -88,7 +93,7 @@ export const PacketStreams: React.FC<PacketStreamsProps> = ({ nodes, links }) =>
       const lineData = activePacketLines[index % activePacketLines.length]
       if (!lineData) return
 
-      const speed = (lineData.link.trafficSpeed || 1) * 0.45
+      const speed = (lineData.link.trafficSpeed || 1) * 0.45 * velocityMultiplier
       const progress = (t * speed + index * 0.22) % 1
 
       const src = new THREE.Vector3(...lineData.srcPos)

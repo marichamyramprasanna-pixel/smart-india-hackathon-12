@@ -8,12 +8,21 @@ import { CommandPalette } from './CommandPalette'
 import { CyberCursor } from '../common/CyberCursor'
 import { ScrollEffects } from '../common/ScrollEffects'
 import { ScrollParticleMatrix } from '../common/ScrollParticleMatrix'
-import { ThreatAutoBlockInterceptor } from '../common/ThreatAutoBlockInterceptor'
+import { GmailIncidentMonitor } from '../common/GmailIncidentMonitor'
+import { ConsoleLockGuard } from '../security/ConsoleLockGuard'
 import { SentinelAIChat } from '../ai-assistant/SentinelAIChat'
 import { useSentinelAI } from '../../context/SentinelAIContext'
+import { JuryWalkthroughPanel } from '../dashboard/JuryWalkthroughPanel'
+import { cn } from '../../utils/cn'
+import { PanelLeftOpen } from 'lucide-react'
 
 export const AppShell: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024
+    }
+    return true
+  })
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const { toggleOpen: toggleAiChat } = useSentinelAI()
 
@@ -43,14 +52,27 @@ export const AppShell: React.FC = () => {
       <div className="fixed bottom-0 left-1/3 h-[30rem] w-[30rem] rounded-full bg-emerald-500/10 blur-[140px] pointer-events-none z-0" />
       <div className="fixed top-2/3 right-1/4 h-[26rem] w-[26rem] rounded-full bg-rose-500/10 blur-[130px] pointer-events-none z-0" />
 
+      {/* Floating Button to Bring Back Navigation Menu when Closed */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-20 left-0 z-40 flex items-center gap-2 px-3 py-2 rounded-r-xl border border-l-0 border-cyan-500/50 bg-slate-950/95 text-cyan-300 shadow-neon-cyan hover:bg-slate-900 transition-all font-mono text-xs font-bold animate-in fade-in slide-in-from-left-2 duration-300 group"
+          title="Bring back navigation menu"
+          aria-label="Bring back navigation menu"
+        >
+          <PanelLeftOpen className="h-4 w-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+          <span>Open Navigation Menu</span>
+        </button>
+      )}
+
       {/* Persistent Left Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content Layout */}
-      <div className="flex flex-1 flex-col lg:pl-64 z-10 min-w-0">
+      <div className={cn('flex flex-1 flex-col z-10 min-w-0 transition-all duration-300', sidebarOpen ? 'lg:pl-64' : 'lg:pl-0')}>
         {/* Persistent Topbar */}
         <Topbar
-          onOpenSidebar={() => setSidebarOpen(true)}
+          onOpenSidebar={() => setSidebarOpen((prev) => !prev)}
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         />
 
@@ -84,8 +106,14 @@ export const AppShell: React.FC = () => {
       {/* Cyber Particle Sparks & Matrix Rain Stream Canvas on Scroll */}
       <ScrollParticleMatrix />
 
-      {/* Automated >90% Threat Interceptor & Quarantine Containment */}
-      <ThreatAutoBlockInterceptor />
+      {/* Emergency Gmail Incident Escalation Monitor (>80% Risk) */}
+      <GmailIncidentMonitor />
+
+      {/* SOC Inactivity Lock & Biometric PIN Session Guard */}
+      <ConsoleLockGuard />
+
+      {/* 3-Minute Guided Jury Presentation Walkthrough Panel */}
+      <JuryWalkthroughPanel />
     </div>
   )
 }

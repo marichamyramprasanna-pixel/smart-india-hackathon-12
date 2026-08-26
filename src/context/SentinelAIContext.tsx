@@ -7,6 +7,8 @@ import { useAlerts } from '../hooks/useAlerts'
 import { useInvestigation } from './InvestigationContext'
 import { useDemoScenario } from './DemoScenarioContext'
 import { deviceService, getDeletedDevices } from '../services/deviceService'
+import { SystemActionEvent } from '../services/systemEventBus'
+import { auditLogService } from '../services/auditLogService'
 
 interface ActiveContextInfo {
   type: 'device' | 'threat' | 'network' | 'global'
@@ -71,6 +73,100 @@ export const SentinelAIProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const clearChat = useCallback(() => {
     setMessages([INITIAL_MESSAGE])
   }, [])
+
+  // Auto-update AI Agent and Chatbot whenever administrative actions occur (deleting, blocking, isolating, restoring)
+  useEffect(() => {
+    const handleSystemAction = (e: Event) => {
+      const customEvent = e as CustomEvent<SystemActionEvent>
+      const act = customEvent.detail
+      if (!act) return
+
+      let content = ''
+      let actions: AIChatMessage['suggestedActions'] = []
+
+      switch (act.type) {
+        case 'DEVICE_ISOLATED':
+          content = `🔒 **[SYSTEM ACTION DETECTED] 802.1X Host Quarantine Enforced**\n\nEndpoint **${act.targetId}** (${act.targetName || act.targetId}) was isolated from the network.\n- **Reason**: ${act.details || 'Autonomous/Analyst Containment'}\n- **Network Policy**: VLAN-999 Port Containment\n- **AI Status**: Live context updated.`
+          actions = [
+            { id: `act-sys-iso-1`, label: 'View Blocked Devices Hub', actionType: 'navigate', payload: { path: '/blocked-devices' } },
+            { id: `act-sys-iso-2`, label: `Release ${act.targetId}`, actionType: 'unisolate', payload: { deviceId: act.targetId } },
+          ]
+          auditLogService.recordAction('QUARANTINE_DEVICE', act.targetId, act.details || 'Quarantine Enforced')
+          break
+
+        case 'DEVICE_UNISOLATED':
+          content = `🔓 **[SYSTEM ACTION DETECTED] Host Quarantine Released**\n\nEndpoint **${act.targetId}** has been released from isolation and restored to normal network routing.`
+          actions = [
+            { id: `act-sys-uniso-1`, label: 'Inspect Fleet Inventory', actionType: 'navigate', payload: { path: '/devices' } },
+          ]
+          auditLogService.recordAction('UNQUARANTINE_DEVICE', act.targetId, 'Quarantine Released')
+          break
+
+        case 'DEVICE_DELETED':
+          content = `🗑️ **[SYSTEM ACTION DETECTED] Endpoint Decommissioned & Archived**\n\nDevice **${act.targetId}** (${act.targetName || act.targetId}) was removed from active inventory and archived to the **Tombstone Vault**.\n- **Audit Compliance**: NIST SP 800-88`
+          actions = [
+            { id: `act-sys-del-1`, label: 'View Deleted Vault', actionType: 'navigate', payload: { path: '/deleted-devices' } },
+            { id: `act-sys-del-2`, label: `Restore ${act.targetId}`, actionType: 'restore', payload: { deviceId: act.targetId } },
+          ]
+          auditLogService.recordAction('DELETE_DEVICE', act.targetId, act.details || 'Decommissioned')
+          break
+
+        case 'ALL_DEVICES_DELETED':
+          content = `🗑️ **[SYSTEM ACTION DETECTED] Fleet Reset & Cleared**\n\nAll active devices have been archived into the Tombstone Vault. Active inventory is now clean for fresh onboarding.`
+          actions = [
+            { id: `act-sys-clr-1`, label: 'Register New Endpoint', actionType: 'navigate', payload: { path: '/devices' } },
+            { id: `act-sys-clr-2`, label: 'View Deleted Archive', actionType: 'navigate', payload: { path: '/deleted-devices' } },
+          ]
+          auditLogService.recordAction('DELETE_DEVICE', 'ALL_DEVICES', 'All devices cleared')
+          break
+
+        case 'DEVICE_RESTORED':
+          content = `♻️ **[SYSTEM ACTION DETECTED] Endpoint Restored from Vault**\n\nDevice **${act.targetId}** (${act.targetName || act.targetId}) has been successfully recovered and enrolled back into active telemetry monitoring.`
+          actions = [
+            { id: `act-sys-res-1`, label: `Inspect ${act.targetId}`, actionType: 'navigate', payload: { path: `/devices/${act.targetId}` } },
+            { id: `act-sys-res-2`, label: 'View Devices Inventory', actionType: 'navigate', payload: { path: '/devices' } },
+          ]
+          auditLogService.recordAction('RESTORE_DEVICE', act.targetId, 'Restored from vault')
+          break
+
+        case 'DEVICE_REGISTERED':
+          content = `✨ **[SYSTEM ACTION DETECTED] New Endpoint Registered**\n\nEndpoint **${act.targetId}** (${act.targetName || act.targetId}) is now actively reporting NetFlow telemetry and Shannon entropy metrics.`
+          actions = [
+            { id: `act-sys-reg-1`, label: `Inspect ${act.targetId}`, actionType: 'navigate', payload: { path: `/devices/${act.targetId}` } },
+          ]
+          break
+
+        case 'IP_BLOCKED':
+          content = `🛡️ **[SYSTEM ACTION DETECTED] Perimeter Firewall Drop Enforced**\n\nHostile IP **${act.targetId}** was added to perimeter firewall drop lists.\n- **Status**: Null-routed`
+          actions = [
+            { id: `act-sys-ip-1`, label: 'View Firewall Drop List', actionType: 'navigate', payload: { path: '/blocked-devices' } },
+          ]
+          auditLogService.recordAction('BLOCK_IP', act.targetId, act.details || 'Firewall drop')
+          break
+
+        case 'IP_UNBLOCKED':
+          content = `🔓 **[SYSTEM ACTION DETECTED] Perimeter IP Unblocked**\n\nIP **${act.targetId}** was removed from the perimeter firewall drop list.`
+          auditLogService.recordAction('UNBLOCK_IP', act.targetId, 'Firewall unblock')
+          break
+      }
+
+      if (content) {
+        const sysMsg: AIChatMessage = {
+          id: `ai-sys-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          sender: 'assistant',
+          timestamp: new Date().toLocaleTimeString(),
+          content,
+          confidence: 100,
+          suggestedActions: actions,
+        }
+        setMessages((prev) => [...prev, sysMsg])
+        refetchDevices()
+      }
+    }
+
+    window.addEventListener('sentinelx_system_action', handleSystemAction)
+    return () => window.removeEventListener('sentinelx_system_action', handleSystemAction)
+  }, [refetchDevices])
 
   // Helper to resolve device ID from command text or current context
   const resolveTargetDevice = (text: string) => {

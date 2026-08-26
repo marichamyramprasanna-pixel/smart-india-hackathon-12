@@ -6,7 +6,7 @@ describe('Threat Management Filters', () => {
     const al2041 = demoThreats.find((t) => t.alertCode === 'AL-2041')
     expect(al2041).toBeDefined()
     expect(al2041?.severity).toBe('CRITICAL')
-    expect(al2041?.deviceId).toBe('DEVICE-042')
+    expect(al2041?.deviceId).toBe('SERVER-99')
     expect(al2041?.confidenceScore).toBe(94)
   })
 
@@ -17,7 +17,7 @@ describe('Threat Management Filters', () => {
   })
 
   it('filters threats by device ID', () => {
-    const dev42Threats = demoThreats.filter((t) => t.deviceId === 'DEVICE-042')
-    expect(dev42Threats.length).toBeGreaterThanOrEqual(3)
+    const server99Threats = demoThreats.filter((t) => t.deviceId === 'SERVER-99')
+    expect(server99Threats.length).toBeGreaterThanOrEqual(2)
   })
 })

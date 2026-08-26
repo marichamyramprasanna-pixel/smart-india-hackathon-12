@@ -13,7 +13,15 @@ import { useAlerts } from '../../hooks/useAlerts'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../common/Tooltip'
 import { SpotlightCard } from '../common/SpotlightCard'
 
-export const MetricKPICards: React.FC = () => {
+interface MetricKPICardsProps {
+  simulatedPackets?: number
+  timeframe?: 'realtime' | '24h' | '7d'
+}
+
+export const MetricKPICards: React.FC<MetricKPICardsProps> = ({
+  simulatedPackets = 14280,
+  timeframe = 'realtime',
+}) => {
   const { currentStage } = useDemoScenario()
   const { devices } = useDevices()
   const { alerts } = useAlerts()
@@ -37,12 +45,33 @@ export const MetricKPICards: React.FC = () => {
       ? Math.min(99, Math.max(88, Math.round(96 - maxCompromise * 0.05)))
       : 98
 
+  // Compute dynamic timeframe descriptions
+  const getDeviceTrend = () => {
+    if (timeframe === 'realtime') return `Ingesting ${simulatedPackets.toLocaleString()} pkts/s`
+    if (timeframe === '24h') return `Avg ${(simulatedPackets * 0.94).toLocaleString().split('.')[0]} pkts/s`
+    return `Fleet total: ${activeDeviceCount} agents online`
+  }
+
+  const getSuspiciousTrend = () => {
+    if (suspiciousCount === 0) return '0 anomalous devices'
+    if (timeframe === 'realtime') return `${suspiciousCount} active anomalies`
+    if (timeframe === '24h') return `${suspiciousCount} flagged past 24h`
+    return `${suspiciousCount} flagged past 7d`
+  }
+
+  const getHealthTrend = () => {
+    if (calculatedHealth >= 80) {
+      return timeframe === 'realtime' ? 'Nominal stability' : '99.98% uptime SLA'
+    }
+    return 'Action required'
+  }
+
   const metrics = [
     {
       id: 'kpi-active-devs',
       label: 'Active Endpoints',
       value: activeDeviceCount > 0 ? activeDeviceCount.toString() : '0',
-      trend: `${activeDeviceCount} live telemetry agents`,
+      trend: getDeviceTrend(),
       icon: <Laptop className="h-4 w-4 text-cyan-300" />,
       tooltip: 'Continuous telemetry agents and flow sensors actively streaming from network subnets.',
       cardBg: 'from-cyan-950/40 via-slate-900/80 to-slate-950/90 border-cyan-500/30 hover:border-cyan-400/60 shadow-neon-cyan/20 hover:shadow-neon-cyan/40',
@@ -55,7 +84,7 @@ export const MetricKPICards: React.FC = () => {
       id: 'kpi-suspicious-devs',
       label: 'Suspicious Hosts',
       value: suspiciousCount.toString(),
-      trend: suspiciousCount > 0 ? `+${suspiciousCount} flagged anomaly` : '0 nominal variance',
+      trend: getSuspiciousTrend(),
       icon: <AlertTriangle className="h-4 w-4 text-amber-300" />,
       tooltip: 'Endpoints with statistical behavioral deviations exceeding 2.5 sigma baseline.',
       cardBg: 'from-amber-950/40 via-slate-900/80 to-slate-950/90 border-amber-500/30 hover:border-amber-400/60 shadow-neon-amber/20 hover:shadow-neon-amber/40',
@@ -68,7 +97,7 @@ export const MetricKPICards: React.FC = () => {
       id: 'kpi-active-threats',
       label: 'Active Threats',
       value: activeAlertCount.toString(),
-      trend: activeAlertCount > 0 ? 'CRITICAL Containment' : '0 Hostile IoCs',
+      trend: activeAlertCount > 0 ? `${activeAlertCount} incidents open` : '0 open alerts',
       icon: <Flame className="h-4 w-4 text-red-400 animate-pulse" />,
       tooltip: 'Correlated multi-vector security incidents requiring SOC analyst triage or containment.',
       cardBg: 'from-red-950/50 via-slate-900/80 to-slate-950/90 border-red-500/40 hover:border-red-400/70 shadow-neon-red/25 hover:shadow-neon-red/50',
@@ -81,7 +110,7 @@ export const MetricKPICards: React.FC = () => {
       id: 'kpi-network-health',
       label: 'Network Health',
       value: `${calculatedHealth}%`,
-      trend: calculatedHealth >= 80 ? 'Optimal Stability' : 'Elevated Risk',
+      trend: getHealthTrend(),
       icon: <Activity className="h-4 w-4 text-emerald-300" />,
       tooltip: 'Composite telemetry stability index across DNS, NetFlow, and authentication integrity.',
       cardBg: 'from-emerald-950/40 via-slate-900/80 to-slate-950/90 border-emerald-500/30 hover:border-emerald-400/60 shadow-neon-emerald/20 hover:shadow-neon-emerald/40',

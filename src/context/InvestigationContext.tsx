@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import { trackEvent } from '../api/analytics'
+import { emitSystemAction } from '../services/systemEventBus'
 
 interface IsolationRecord {
   deviceId: string
@@ -51,6 +52,12 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         reason,
       },
     }))
+    emitSystemAction({
+      type: 'DEVICE_ISOLATED',
+      targetId: deviceId,
+      targetName: hostname,
+      details: reason,
+    })
     trackEvent('device_isolated', { deviceId, hostname })
   }, [])
 
@@ -59,6 +66,10 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
       const copy = { ...prev }
       delete copy[deviceId]
       return copy
+    })
+    emitSystemAction({
+      type: 'DEVICE_UNISOLATED',
+      targetId: deviceId,
     })
   }, [])
 
@@ -76,6 +87,11 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         reason,
       },
     }))
+    emitSystemAction({
+      type: 'IP_BLOCKED',
+      targetId: ip,
+      details: reason,
+    })
   }, [])
 
   const unblockIp = useCallback((ip: string) => {
@@ -83,6 +99,10 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
       const copy = { ...prev }
       delete copy[ip]
       return copy
+    })
+    emitSystemAction({
+      type: 'IP_UNBLOCKED',
+      targetId: ip,
     })
   }, [])
 

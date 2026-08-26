@@ -101,6 +101,16 @@ export function buildGmailComposeUrl(recipient: string, subject: string, bodyTex
 }
 
 /**
+ * Builds standard RFC 2368 mailto: URI fallback for default OS mail clients (Outlook, Thunderbird, Apple Mail)
+ */
+export function buildMailtoUrl(recipient: string, subject: string, bodyText: string): string {
+  const encTo = encodeURIComponent(recipient)
+  const encSubject = encodeURIComponent(subject)
+  const encBody = encodeURIComponent(bodyText)
+  return `mailto:${encTo}?subject=${encSubject}&body=${encBody}`
+}
+
+/**
  * Generates structured email text body for SOC incident response
  */
 export function generateSecurityAdvisoryBody(payload: GmailAlertPayload): string {
@@ -139,6 +149,38 @@ This alert was generated and automatically dispatched to ramprasannamarichamy31@
 =====================================================`
 }
 
+/**
+ * Dispatches real background email directly to recipient via HTTP POST
+ */
+export async function sendDirectBackgroundEmail(
+  recipient: string,
+  subject: string,
+  bodyText: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(recipient)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        _subject: subject,
+        name: 'SentinelX Autonomous SOC Copilot',
+        email: 'soc-alerts@sentinelx.security',
+        message: bodyText,
+        _template: 'box',
+        _captcha: 'false',
+      }),
+    })
+    const data = await response.json()
+    return { success: data.success === 'true' || data.success === true, message: data.message }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Direct delivery error'
+    return { success: false, message }
+  }
+}
+
 export const gmailAlertService = {
   /**
    * Triggers automated Gmail emergency alert if risk score is >= 80%
@@ -152,6 +194,7 @@ export const gmailAlertService = {
     reason?: string
     log?: GmailDispatchLog
     composeUrl?: string
+    directDeliveryPromise?: Promise<{ success: boolean; message?: string }>
   }> {
     // 1. Threshold Check: Must be >= 80%
     if (payload.riskScore < 80 && payload.compromiseProbability < 80) {
@@ -170,6 +213,9 @@ export const gmailAlertService = {
     const subject = `🚨 [CRITICAL ALERT] ${payload.riskScore}% Risk Threat on ${payload.deviceId} (${payload.hostname})`
     const bodyText = generateSecurityAdvisoryBody(payload)
     const composeUrl = buildGmailComposeUrl(recipient, subject, bodyText)
+
+    // Fire direct background HTTP transmission to deliver to inbox
+    const directDeliveryPromise = sendDirectBackgroundEmail(recipient, subject, bodyText)
 
     const dispatchLog: GmailDispatchLog = {
       id: `gmail-alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -200,20 +246,38 @@ export const gmailAlertService = {
       dispatched: true,
       log: dispatchLog,
       composeUrl,
+      directDeliveryPromise,
     }
   },
 
   /**
-   * Helper to open Gmail Web Compose directly in a popup/new tab
+   * Helper to open Gmail Web Compose directly in a popup/new tab, with fallback
    */
-  openGmailCompose(composeUrl: string): void {
+  openGmailCompose(composeUrl: string): boolean {
     if (typeof window !== 'undefined') {
       try {
         const parsed = new URL(composeUrl)
         if (parsed.protocol === 'https:' && parsed.hostname === 'mail.google.com') {
-          window.open(composeUrl, '_blank', 'noopener,noreferrer')
+          const win = window.open(composeUrl, '_blank', 'noopener,noreferrer')
+          if (!win || win.closed || typeof win.closed === 'undefined') {
+            // Popup blocked: fallback to navigation or window open
+            return false
+          }
+          return true
         }
-      } catch {}
+      } catch {
+        return false
+      }
+    }
+    return false
+  },
+
+  /**
+   * Helper to launch local OS mail client using mailto: protocol
+   */
+  openMailClient(mailtoUrl: string): void {
+    if (typeof window !== 'undefined') {
+      window.location.href = mailtoUrl
     }
   },
 

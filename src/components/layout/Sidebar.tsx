@@ -150,7 +150,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       {/* Sidebar Navigation Panel */}
       <aside
         className={cn(
-          'fixed top-0 bottom-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-[#020617] backdrop-blur-xl transition-transform duration-300 ease-in-out lg:translate-x-0',
+          'fixed top-0 bottom-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-[#020617] backdrop-blur-xl transition-transform duration-300 ease-in-out',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -177,7 +177,9 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-slate-100 lg:hidden"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-slate-100 transition-colors"
+            title="Close navigation menu"
+            aria-label="Close navigation menu"
           >
             <X className="h-5 w-5" />
           </button>
