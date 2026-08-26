@@ -27,6 +27,11 @@ import { Network2DFallback } from './Network2DFallback'
 import { Button } from '../common/Button'
 import { Badge } from '../common/Badge'
 import { useDemoScenario } from '../../context/DemoScenarioContext'
+import { deviceService } from '../../services/deviceService'
+import { cyberAudioService } from '../../services/cyberAudioService'
+import { emitSystemAction } from '../../services/systemEventBus'
+import { useDevices } from '../../hooks/useDevices'
+import { useAlerts } from '../../hooks/useAlerts'
 
 interface NetworkTopologyCanvasProps {
   nodes: Network3DNode[]
@@ -45,6 +50,8 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   const navigate = useNavigate()
   const { currentStage } = useDemoScenario()
   const controlsRef = useRef<any>(null)
+  const { refetch: refetchDevices } = useDevices()
+  const { refetch: refetchAlerts } = useAlerts()
 
   const [selectedNode, setSelectedNode] = useState<Network3DNode | null>(null)
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d')
@@ -52,12 +59,45 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [autoRotate, setAutoRotate] = useState(true)
   const [cameraPreset, setCameraPreset] = useState<'overview' | 'threat' | 'top'>('overview')
+  const [isInjecting, setIsInjecting] = useState(false)
 
   // Real-time canvas render parameter controls
   const [nodeScale, setNodeScale] = useState(1.0)
   const [starfieldDensity, setStarfieldDensity] = useState(4000)
   const [packetVelocity, setPacketVelocity] = useState(1.0)
   const [showConfig, setShowConfig] = useState(false)
+
+  const handleAutoInjectThreatDevice = async () => {
+    setIsInjecting(true)
+    const idNum = Math.floor(Math.random() * 899 + 100)
+    const deviceId = `SERVER-THREAT-${idNum}`
+    const hostname = `COMPROMISED-NODE-${idNum}`
+    const ip = `10.0.9.${Math.floor(Math.random() * 200 + 10)}`
+
+    await deviceService.createDevice({
+      id: deviceId,
+      hostname,
+      ip_address: ip,
+      device_type: 'Server',
+      department: 'Threat Target Subnet',
+      owner: 'Ransomware C2 Botnet',
+      status: 'COMPROMISED',
+      risk_score: 96,
+      compromise_probability: 95,
+    })
+
+    cyberAudioService.playAlarm()
+    emitSystemAction({
+      type: 'DEVICE_REGISTERED',
+      targetId: deviceId,
+      targetName: hostname,
+      details: 'COMPROMISED - C2 Beaconing & Ransomware Staging (96% Risk)',
+    })
+
+    await refetchDevices()
+    await refetchAlerts()
+    setTimeout(() => setIsInjecting(false), 800)
+  }
 
   // Sync node statuses dynamically with DemoScenario state
   const reactiveNodes = nodes.map((n) => {
@@ -164,7 +204,20 @@ export const NetworkTopologyCanvas: React.FC<NetworkTopologyCanvasProps> = ({
         </div>
 
         {/* Camera Presets, Auto-Rotate & Mode Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Auto-Inject Threat Device Button */}
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleAutoInjectThreatDevice}
+            isLoading={isInjecting}
+            className="h-8 text-[11px] font-bold gap-1 shadow-red-glow-sm border-red-500/50"
+            title="Auto-inject a new compromised threat device into 3D space"
+          >
+            <Sparkles className="h-3.5 w-3.5 fill-current" />
+            <span>+ Auto Threat Node</span>
+          </Button>
+
           {/* Camera Preset Buttons */}
           <div className="hidden lg:flex items-center gap-1 bg-slate-900/80 p-0.5 rounded-lg border border-slate-800 text-xs font-mono">
             <button
